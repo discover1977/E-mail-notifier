@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta name = 'viewport' content='width=device-width, initial-scale=1', charset = "utf-8">
+		<link rel = "stylesheet" type = "text/css" href = "main.css">
+	</head>
+	<body onload="process()">
+		<table>
+			<tr>
+				<td>E-mail</td> <td>E-mail server</td> <td>E-mail password</td> <td>E-mail color</td>
+			</tr>
+			<form action="/email_param"  method="post">	
+				<tr>
+					<td><input id="email1" type="email" name="email1"></td>
+					<td><input id="email_srv1" type="text" name="email_srv1"></td>
+					<td><input id="email_pass1" type="password" name="email_pass1" autocomplete="on"></td>
+					<td><input id="email_col1" type="color" name="email_col1"></td>
+				</tr>
+				<tr>
+					<td><input id="email2" type="email" name="email2"></td>
+					<td><input id="email_srv2" type="text" name="email_srv2"></td>
+					<td><input id="email_pass2" type="password" name="email_pass2" autocomplete="on"></td>
+					<td><input id="email_col2" type="color" name="email_col2"></td>
+				</tr>
+				<tr>
+					<td><input id="email3" type="email" name="email3"></td>
+					<td><input id="email_srv3" type="text" name="email_srv3"></td>
+					<td><input id="email_pass3" type="password" name="email_pass3" autocomplete="on"></td>
+					<td><input id="email_col3" type="color" name="email_col3"></td>
+				</tr>
+				<tr>
+					<td><input id="email4" type="email" name="email4"></td>
+					<td><input id="email_srv4" type="text" name="email_srv4"></td>
+					<td><input id="email_pass4" type="password" name="email_pass4" autocomplete="on"></td>
+					<td><input id="email_col4" type="color" name="email_col4"></td>
+				</tr>
+				<tr>
+					<td>
+						<label for="interval">Interval</label>
+						<input id="interval" type="number" name="interval" value="5" min="0" max="10">
+					</td>
+				</tr>
+				<tr>
+					<td><input type="submit" value="Save accounts"></td>
+					<td><button id='butFRead' value ='butFRead' type='button' onclick="push_butt(this.value)">Force read</button></td>
+					<td><button id='butTestLED' value ='butTestLED' type='button' onclick="push_butt(this.value)">Test LED</button></td>
+				</tr>
+			</form>	
+		</table>
+		<br>
+		<br>
+		<table>
+			<tr>
+				<td colspan="2">
+					<hr>
+					AP Settings<br>
+					<form action="/wifi_param"  method="post">						
+						<label for="wifi_ssid">SSID: </label><br>
+						<input type="text" name="wifi_ssid" required value=""><br>
+						<label for="wifi_pass">Password: </label><br>
+						<input type="password" required name="wifi_pass"><br><br>
+						<input type="submit" value="Confirm">
+					</form>
+					<hr>
+				</td>				
+			</tr>	
+		</table>
+			
+		<script>
+			var xmlHttp = createXmlHttpObject();
+			function createXmlHttpObject() {
+				if(window.XMLHttpRequest) {
+					xmlHttp = new XMLHttpRequest();
+				} else {
+					xmlHttp = new ActiveXObject('Microsoft.XMLHTTP');
+				}
+				return xmlHttp;
+			}
+			
+			function process() {
+				if((xmlHttp.readyState == 0) || (xmlHttp.readyState == 4)) {
+					xmlHttp.onreadystatechange = function() {
+						if((xmlHttp.readyState == 4) && (xmlHttp.status == 200)) {
+							xmlDoc = xmlHttp.responseXML;
+							for(i = 0; i < 4; i++) {
+								xmlmsg = xmlDoc.getElementsByTagName('email')[i].firstChild.nodeValue;
+								document.getElementById('email' + (i + 1)).value = xmlmsg;
+
+								xmlmsg = xmlDoc.getElementsByTagName('email_srv')[i].firstChild.nodeValue;
+								document.getElementById('email_srv' + (i + 1)).value = xmlmsg;	
+
+								xmlmsg = xmlDoc.getElementsByTagName('email_col')[i].firstChild.nodeValue;
+								document.getElementById('email_col' + (i + 1)).value = xmlmsg;	
+							}
+							xmlmsg = xmlDoc.getElementsByTagName('interval')[0].firstChild.nodeValue;
+							document.getElementById('interval').value = xmlmsg;
+						}
+					}
+					xmlHttp.open('PUT', 'xml', true);
+					xmlHttp.send(null);
+				}
+				//setTimeout('process()', 1000);	// таймаут запроса XML
+			}	
+		
+			function push_butt(suf) {	
+				if((xmlHttp.readyState == 0) || (xmlHttp.readyState == 4)) {
+					xmlHttp.open('PUT', 'pushButt?buttID=' + suf);
+					xmlHttp.send();
+				}
+			}
+		</script>
+	</body>
+</html> 

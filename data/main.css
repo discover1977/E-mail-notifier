@@ -1,0 +1,48 @@
+* {box-sizing: border-box}
+
+/* Set height of body and the document to 100% */
+body, html {
+	height: 100%;
+	margin: 0;
+	padding: 8px;
+	font-family: Calibri;
+}
+
+table, th, td {
+	all: none;
+	-border: 1px solid rgb(160, 160, 160);
+	border-collapse: collapse;	
+}
+th, td {
+	padding: 4px;
+	-text-align: center;
+}
+th {
+	-text-align: center;
+}
+tr {
+	padding: 4px;
+	vertical-align: bottom;
+}
+
+#butLEDOn {
+	color: #fff; /* цвет текста */
+	text-decoration: none; /* убирать подчёркивание у ссылок */
+	user-select: none; /* убирать выделение текста */
+	background: rgb(212,75,56); /* фон кнопки */
+	padding: .7em 1.5em; /* отступ от текста */
+	outline: none; /* убирать контур в Mozilla */
+  } 
+#butLEDOn:hover { background: rgb(232,95,76); } /* при наведении курсора мышки */
+#butLEDOn:active { background: rgb(152,15,0); } /* при нажатии */
+
+#butLEDOff {
+	color: #fff; /* цвет текста */
+	text-decoration: none; /* убирать подчёркивание у ссылок */
+	user-select: none; /* убирать выделение текста */
+	background: rgb(212,75,56); /* фон кнопки */
+	padding: .7em 1.5em; /* отступ от текста */
+	outline: none; /* убирать контур в Mozilla */
+  } 
+#butLEDOff:hover { background: rgb(232,95,76); } /* при наведении курсора мышки */
+#butLEDOff:active { background: rgb(152,15,0); } /* при нажатии */
