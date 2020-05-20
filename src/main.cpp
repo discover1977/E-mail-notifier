@@ -30,7 +30,7 @@ typedef struct {
 } EMailData;
 
 const char web_user[] = "admin";
-const char web_pass[] = "notifier2020";
+const char web_pass[] = "notifier1977";
 
 String email[4];
 String email_srv[4];
@@ -130,14 +130,21 @@ bool loadFromSpiffs(String path) {
   return true;
 }
 
+void print_remote_IP() {
+  Serial.print("Remote IP address: ");
+  Serial.println(server.client().remoteIP().toString());
+}
+
 /* Обработчик/handler запроса XML данных */
 void h_XML() {
   Serial.println(F("h_XML"));
+  print_remote_IP();
   server.send(200, F("text/xml"), build_XML());
 }
 
 void h_wifi_param() {
   Serial.println(F("h_wifi_param"));
+  print_remote_IP();
   if(!server.authenticate(web_user, web_pass)) return server.requestAuthentication();
   String ssid = server.arg(F("wifi_ssid"));
   String pass = server.arg(F("wifi_pass"));
@@ -168,8 +175,19 @@ int str2int(String strValue) {
 
 void h_Email_param() {
   Serial.println(F("h_Email_param"));
+  print_remote_IP();
   if(!server.authenticate(web_user, web_pass)) return server.requestAuthentication();
-  email[0] = server.arg(F("email1"));
+
+  for(int i = 0; i < 4; i++) {
+    email[i] = server.arg(String("email") + (i + 1));
+    email_srv[i] = server.arg(String("email_srv") + (i + 1));
+    if(server.arg(String("email_pass") + (i + 1)) != "") {
+      email_pass[i] = server.arg(String("email_pass") + (i + 1));
+    }
+    email_col[i] = server.arg(String("email_col") + (i + 1));
+  }
+
+  /*email[0] = server.arg(F("email1"));
   email[1] = server.arg(F("email2"));
   email[2] = server.arg(F("email3"));
   email[3] = server.arg(F("email4"));
@@ -187,7 +205,7 @@ void h_Email_param() {
   email_col[0] = server.arg(F("email_col1"));
   email_col[1] = server.arg(F("email_col2"));
   email_col[2] = server.arg(F("email_col3"));
-  email_col[3] = server.arg(F("email_col4"));
+  email_col[3] = server.arg(F("email_col4"));*/
 
   Param.interval = server.arg(F("interval")).toInt();
   EEPROM.put(PARAM_ADDR, Param);
@@ -214,6 +232,7 @@ void h_Email_param() {
 
 void h_pushButt() {
   Serial.println(F("h_pushButt"));
+  print_remote_IP();
   if(!server.authenticate(web_user, web_pass)) return server.requestAuthentication();
   Serial.print(F("Server has: ")); Serial.print(server.args()); Serial.println(F(" argument(s):"));
   for(int i = 0; i < server.args(); i++) {
@@ -231,8 +250,9 @@ void h_pushButt() {
   server.send(200, F("text/xml"), build_XML());
 }
 
-void handleWebRequests() {
-  Serial.println("handleWebRequests");
+void h_WebRequests() {
+  Serial.println("h_WebRequests");
+  print_remote_IP();
   if(!server.authenticate(web_user, web_pass)) return server.requestAuthentication();
   if(loadFromSpiffs(server.uri())) return;
   Serial.println(F("File Not Detected"));
@@ -255,6 +275,7 @@ void handleWebRequests() {
 /* Отправляет клиенту(браузеру) HTML страницу */
 void h_Website() {
   Serial.println("h_Website");
+  print_remote_IP();
   if(!server.authenticate(web_user, web_pass)) return server.requestAuthentication();
   server.sendHeader(F("Location"), F("/index.html"), true);   //Redirect to our html web page
   server.send(302, F("text/plane"), "");
@@ -447,7 +468,7 @@ void WiFiConnect(void* param) {
   server.on(F("/wifi_param"), h_wifi_param); 
   server.on(F("/email_param"), h_Email_param);
   server.on(F("/pushButt"), h_pushButt);    
-  server.onNotFound(handleWebRequests);       
+  server.onNotFound(h_WebRequests);       
   server.on(F("/xml"), h_XML);
   server.begin();
 
@@ -462,9 +483,12 @@ void WiFiConnect(void* param) {
 
 int readEmail() {
   uint8_t emailCount = 0;
+  //Serial.print("heap before read: "); Serial.println(esp_get_free_heap_size());
   MailClient.readMail(imapData);
   emailCount = imapData.availableMessages();
+  //Serial.print("heap after read: "); Serial.println(esp_get_free_heap_size());
   imapData.clearMessageData();
+  //Serial.print("heap after clear read: "); Serial.println(esp_get_free_heap_size());
   return emailCount;
 }
 
