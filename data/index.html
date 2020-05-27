@@ -4,7 +4,7 @@
 		<meta name = 'viewport' content='width=device-width, initial-scale=1', charset = "utf-8">
 		<link rel = "stylesheet" type = "text/css" href = "main.css">
 	</head>
-	<body onload="process()">
+	<body onload="process(); upTimeUpd()">
 		<table>
 			<tr>
 				<td>E-mail</td> <td>E-mail server</td> <td>E-mail password</td> <td>E-mail color</td>
@@ -45,6 +45,10 @@
 					<td><button id='butFRead' value ='butFRead' type='button' onclick="push_butt(this.value)">Force read</button></td>
 					<td><button id='butTestLED' value ='butTestLED' type='button' onclick="push_butt(this.value)">Test LED</button></td>
 				</tr>
+				<tr>
+					<td>Up time: </td>
+					<td id='uptime'>...</td>
+				</tr>
 			</form>	
 		</table>
 		<br>
@@ -68,6 +72,7 @@
 			
 		<script>
 			var xmlHttp = createXmlHttpObject();
+			var xmlHttpUpUpd = createXmlHttpObject();
 			function createXmlHttpObject() {
 				if(window.XMLHttpRequest) {
 					xmlHttp = new XMLHttpRequest();
@@ -76,8 +81,34 @@
 				}
 				return xmlHttp;
 			}
+
+			function ut_to_str(ut) {
+				var d = Math.floor(ut / 86400);
+				var h = Math.floor(ut / 3600);
+				var m = Math.floor(ut / 60) - (h * 60);
+				var s = ut % 60;
+				return utStr = (d) + "." + 
+							   (h.toString().padStart(2, '0')) + ":" + 
+							   (m.toString().padStart(2, '0')) + ":" + 
+							   (s.toString().padStart(2, '0'));
+			}
+
+			function upTimeUpd() {
+				if((xmlHttpUpUpd.readyState == 0) || (xmlHttpUpUpd.readyState == 4)) {
+					xmlHttpUpUpd.onreadystatechange = function() {
+						if((xmlHttpUpUpd.readyState == 4) && (xmlHttpUpUpd.status == 200)) {
+							xmlDoc = xmlHttpUpUpd.responseXML;
+							xmlmsg = xmlDoc.getElementsByTagName('uptime')[0].firstChild.nodeValue;
+							document.getElementById('uptime').innerHTML = ut_to_str(xmlmsg);
+						}
+					}
+					xmlHttpUpUpd.open('PUT', 'xml', true);
+					xmlHttpUpUpd.send(null);
+				}
+				setTimeout('upTimeUpd()', 1000);	// таймаут запроса XML
+			}
 			
-			function process() {
+			function process() {				
 				if((xmlHttp.readyState == 0) || (xmlHttp.readyState == 4)) {
 					xmlHttp.onreadystatechange = function() {
 						if((xmlHttp.readyState == 4) && (xmlHttp.status == 200)) {
@@ -100,6 +131,7 @@
 					xmlHttp.send(null);
 				}
 				//setTimeout('process()', 1000);	// таймаут запроса XML
+				//upTimeUpd();
 			}	
 		
 			function push_butt(suf) {	

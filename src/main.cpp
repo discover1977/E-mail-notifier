@@ -8,11 +8,12 @@
 #include <ESP32_MailClient.h>
 #include <FastLED.h>
 
-TaskHandle_t WiFiConnect_h, ReadEmailCount_h;
+TaskHandle_t WiFiConnect_h, ReadEmailCount_h, UpTimeCounter_h;
 QueueHandle_t MsgCountQueueHandle, FReadQueueHandle, TestLEDQueueHandle;
 
 // Заголовки функций
 void WiFiConnect(void* param);
+void UpTimeCounter(void* param);
 void ReadEmailCount(void* param);
 int readEmail();
 void readCallback(ReadStatus msg);
@@ -43,6 +44,7 @@ EMailData rxED;
 bool FRead = false;
 bool TestLED = false;
 bool ftpEn = false;
+uint32_t UpTime = 0;
 
 #define PARAM_ADDR  (0)
 struct Param {
@@ -58,6 +60,36 @@ const char* ap_ssid = "E-mail";
 const char* ap_pass = "1234567890";
 const char* ftpUser = "esp32";
 const char* ftpPass = "esp32";
+
+/*struct UpTime {
+  uint8_t second = 0; 
+  uint8_t minute = 0;
+  uint8_t hour = 0;
+  uint16_t day = 0;
+} UpTime;
+
+void ut_poll() {
+  if(++UpTime.second == 60) {
+    UpTime.second = 0;
+    if(++UpTime.minute == 60) {
+      UpTime.minute = 0;
+      if(++UpTime.hour == 24) {
+        UpTime.hour = 0;
+        ++UpTime.day;
+      }
+    }
+  }
+}
+
+void sprint_ut() {
+  char txt[16];
+  sprintf(txt, "Up time: %03d.%02d:%02d:%02d", UpTime.day, UpTime.hour, UpTime.minute, UpTime.second);
+  Serial.println(txt);
+}
+
+void SecondTimer() {
+  ut_poll();
+}*/
 
 void save_param() {
   int eSize = sizeof(Param);
@@ -86,6 +118,9 @@ String build_XML() {
   xmlStr += F("<interval>");
   xmlStr += Param.interval;
   xmlStr += F("</interval>");
+  xmlStr += F("<uptime>");
+  xmlStr += UpTime;
+  xmlStr += F("</uptime>");
   for (int i = 0; i < 4; i++) {
     xmlStr += F("<email>");
     xmlStr += email[i];
@@ -186,26 +221,6 @@ void h_Email_param() {
     }
     email_col[i] = server.arg(String("email_col") + (i + 1));
   }
-
-  /*email[0] = server.arg(F("email1"));
-  email[1] = server.arg(F("email2"));
-  email[2] = server.arg(F("email3"));
-  email[3] = server.arg(F("email4"));
-
-  email_srv[0] = server.arg(F("email_srv1"));
-  email_srv[1] = server.arg(F("email_srv2"));
-  email_srv[2] = server.arg(F("email_srv3"));
-  email_srv[3] = server.arg(F("email_srv4"));
-
-  if(server.arg(F("email_pass1")) != "") email_pass[0] = server.arg(F("email_pass1"));
-  if(server.arg(F("email_pass2")) != "") email_pass[1] = server.arg(F("email_pass2"));
-  if(server.arg(F("email_pass3")) != "") email_pass[2] = server.arg(F("email_pass3"));
-  if(server.arg(F("email_pass4")) != "") email_pass[3] = server.arg(F("email_pass4"));
-
-  email_col[0] = server.arg(F("email_col1"));
-  email_col[1] = server.arg(F("email_col2"));
-  email_col[2] = server.arg(F("email_col3"));
-  email_col[3] = server.arg(F("email_col4"));*/
 
   Param.interval = server.arg(F("interval")).toInt();
   EEPROM.put(PARAM_ADDR, Param);
@@ -355,6 +370,15 @@ void setup() {
   Serial.println(String("CPU frequncy: ") + ets_get_cpu_frequency());
   Serial.println();
 
+  xTaskCreatePinnedToCore(
+          UpTimeCounter,   
+          "Up time counter",     
+          2048,       
+          NULL,         
+          2,            
+          &UpTimeCounter_h,  
+          1);
+
   led_init();
 
   MsgCountQueueHandle = xQueueCreate(4, sizeof(rxED));  
@@ -369,6 +393,14 @@ void setup() {
             1,            
             &WiFiConnect_h,  
             0);
+}
+
+void UpTimeCounter(void* param) {
+  UpTime = 0;
+  for(;;) {
+    UpTime++;
+    vTaskDelay(pdMS_TO_TICKS(1000));
+  }
 }
 
 void loop() {
@@ -483,12 +515,9 @@ void WiFiConnect(void* param) {
 
 int readEmail() {
   uint8_t emailCount = 0;
-  //Serial.print("heap before read: "); Serial.println(esp_get_free_heap_size());
   MailClient.readMail(imapData);
   emailCount = imapData.availableMessages();
-  //Serial.print("heap after read: "); Serial.println(esp_get_free_heap_size());
   imapData.clearMessageData();
-  //Serial.print("heap after clear read: "); Serial.println(esp_get_free_heap_size());
   return emailCount;
 }
 
