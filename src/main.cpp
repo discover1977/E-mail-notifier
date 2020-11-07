@@ -31,7 +31,7 @@ typedef struct {
 } EMailData;
 
 const char web_user[] = "admin";
-const char web_pass[] = "notifier1977";
+const char web_pass[] = "Notifier2020";
 
 String email[4];
 String email_srv[4];
@@ -60,36 +60,6 @@ const char* ap_ssid = "E-mail";
 const char* ap_pass = "1234567890";
 const char* ftpUser = "esp32";
 const char* ftpPass = "esp32";
-
-/*struct UpTime {
-  uint8_t second = 0; 
-  uint8_t minute = 0;
-  uint8_t hour = 0;
-  uint16_t day = 0;
-} UpTime;
-
-void ut_poll() {
-  if(++UpTime.second == 60) {
-    UpTime.second = 0;
-    if(++UpTime.minute == 60) {
-      UpTime.minute = 0;
-      if(++UpTime.hour == 24) {
-        UpTime.hour = 0;
-        ++UpTime.day;
-      }
-    }
-  }
-}
-
-void sprint_ut() {
-  char txt[16];
-  sprintf(txt, "Up time: %03d.%02d:%02d:%02d", UpTime.day, UpTime.hour, UpTime.minute, UpTime.second);
-  Serial.println(txt);
-}
-
-void SecondTimer() {
-  ut_poll();
-}*/
 
 void save_param() {
   int eSize = sizeof(Param);
@@ -134,6 +104,12 @@ String build_XML() {
     xmlStr += email_col[i];
     xmlStr += F("</email_col>");
   }
+  xmlStr += F("<freeHeap>");
+  xmlStr += ESP.getFreeHeap();
+  xmlStr += F("</freeHeap>");
+  xmlStr += F("<heapSize>");
+  xmlStr += ESP.getHeapSize();
+  xmlStr += F("</heapSize>");
   xmlStr += F("</xml>");
   return xmlStr;
 }
@@ -509,7 +485,8 @@ void WiFiConnect(void* param) {
     server.handleClient();
     /* Обработка запросов FTP клиента */
     if(ftpEn) ftpSrv.handleFTP();
-    vTaskDelay(pdMS_TO_TICKS(10));
+    vTaskDelay(pdMS_TO_TICKS(5));
+    //yield();
   }
 }
 

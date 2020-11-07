@@ -1,76 +1,122 @@
 <!DOCTYPE html>
 <html>
 	<head>
-		<meta name = 'viewport' content='width=device-width, initial-scale=1', charset = "utf-8">
+		<meta name = 'viewport' content='width=device-width' charset = "utf-8">
 		<link rel = "stylesheet" type = "text/css" href = "main.css">
 	</head>
+
 	<body onload="process(); upTimeUpd()">
-		<table>
-			<tr>
-				<td>E-mail</td> <td>E-mail server</td> <td>E-mail password</td> <td>E-mail color</td>
-			</tr>
-			<form action="/email_param"  method="post">	
-				<tr>
-					<td><input id="email1" type="email" name="email1"></td>
-					<td><input id="email_srv1" type="text" name="email_srv1"></td>
-					<td><input id="email_pass1" type="password" name="email_pass1" autocomplete="on"></td>
-					<td><input id="email_col1" type="color" name="email_col1"></td>
-				</tr>
-				<tr>
-					<td><input id="email2" type="email" name="email2"></td>
-					<td><input id="email_srv2" type="text" name="email_srv2"></td>
-					<td><input id="email_pass2" type="password" name="email_pass2" autocomplete="on"></td>
-					<td><input id="email_col2" type="color" name="email_col2"></td>
-				</tr>
-				<tr>
-					<td><input id="email3" type="email" name="email3"></td>
-					<td><input id="email_srv3" type="text" name="email_srv3"></td>
-					<td><input id="email_pass3" type="password" name="email_pass3" autocomplete="on"></td>
-					<td><input id="email_col3" type="color" name="email_col3"></td>
-				</tr>
-				<tr>
-					<td><input id="email4" type="email" name="email4"></td>
-					<td><input id="email_srv4" type="text" name="email_srv4"></td>
-					<td><input id="email_pass4" type="password" name="email_pass4" autocomplete="on"></td>
-					<td><input id="email_col4" type="color" name="email_col4"></td>
-				</tr>
-				<tr>
-					<td>
-						<label for="interval">Interval</label>
-						<input id="interval" type="number" name="interval" value="5" min="0" max="10">
-					</td>
-				</tr>
-				<tr>
-					<td><input type="submit" value="Save accounts"></td>
-					<td><button id='butFRead' value ='butFRead' type='button' onclick="push_butt(this.value)">Force read</button></td>
-					<td><button id='butTestLED' value ='butTestLED' type='button' onclick="push_butt(this.value)">Test LED</button></td>
-				</tr>
-				<tr>
-					<td>Up time: </td>
-					<td id='uptime'>...</td>
-				</tr>
-			</form>	
-		</table>
-		<br>
-		<br>
-		<table>
-			<tr>
-				<td colspan="2">
-					<hr>
-					AP Settings<br>
-					<form action="/wifi_param"  method="post">						
-						<label for="wifi_ssid">SSID: </label><br>
-						<input type="text" name="wifi_ssid" required value=""><br>
-						<label for="wifi_pass">Password: </label><br>
-						<input type="password" required name="wifi_pass"><br><br>
-						<input type="submit" value="Confirm">
-					</form>
-					<hr>
-				</td>				
-			</tr>	
-		</table>
-			
+		<div class="container">
+			<div class="tab">
+				<button class="tablinks" onclick="openTab(event, 'Home')" id="defaultOpen">Home</button>
+				<button class="tablinks" onclick="openTab(event, 'E-mail')">E-mail</button>
+				<button class="tablinks" onclick="openTab(event, 'Wi-Fi')">Wi-Fi</button>
+			</div>
+	
+			<div id="Home" class="tabcontent">
+				<hr>
+				<p>Up time: </p>
+				<p id='uptime'>...</p>
+				<button id='butFRead' value ='butFRead' type='button' onclick="push_butt(this.value)">Force read</button>
+				<button id='butTestLED' value ='butTestLED' type='button' onclick="push_butt(this.value)">Test LED</button>
+				<hr>
+			</div>
+	
+			<div id="E-mail" class="tabcontent">
+				<form action="/email_param"  method="post">	
+					<fieldset>
+						<legend>E-mail 1</legend>
+						<input class="input" id="email1" type="email" name="email1" placeholder='E-mail'>
+						<input class="input" id="email_srv1" type="text" name="email_srv1" placeholder='E-mail server'>
+						<input class="input" id="email_pass1" type="password" name="email_pass1" autocomplete="on" placeholder='E-mail password'>
+						<input id="email_col1" type="color" name="email_col1">
+					</fieldset>	
+					<fieldset>
+						<legend>E-mail 2</legend>
+						<input class="input" id="email2" type="email" name="email2" placeholder='E-mail'>
+						<input class="input" id="email_srv2" type="text" name="email_srv2" placeholder='E-mail server'>
+						<input class="input" id="email_pass2" type="password" name="email_pass2" autocomplete="on" placeholder='E-mail password'>
+						<input id="email_col2" type="color" name="email_col2">
+					</fieldset>	
+					<fieldset>
+						<legend>E-mail 3</legend>
+						<input class="input" id="email3" type="email" name="email3" placeholder='E-mail'>
+						<input class="input" id="email_srv3" type="text" name="email_srv3" placeholder='E-mail server'>
+						<input class="input" id="email_pass3" type="password" name="email_pass3" autocomplete="on" placeholder='E-mail password'>
+						<input id="email_col3" type="color" name="email_col3">
+					</fieldset>	
+					<fieldset>
+						<legend>E-mail 4</legend>
+						<input class="input" id="email4" type="email" name="email4" placeholder='E-mail'>
+						<input class="input" id="email_srv4" type="text" name="email_srv4" placeholder='E-mail server'>
+						<input class="input" id="email_pass4" type="password" name="email_pass4" autocomplete="on" placeholder='E-mail password'>
+						<input id="email_col4" type="color" name="email_col4">
+					</fieldset>	
+					<br>
+					<label for="interval">Interval: </label>
+					<input id="interval" type="number" name="interval" value="5" min="0" max="10">
+					<input type="submit" value="Save accounts">
+				</form>
+			</div>
+	
+			<div id="Wi-Fi" class="tabcontent">
+				<hr>
+				<table>
+					<tr>
+						<td>							
+							AP Settings<br>
+							<form action="/wifi_param"  method="post">						
+								<label for="wifi_ssid">SSID: </label><br>
+								<input type="text" name="wifi_ssid" required value=""><br>
+								<label for="wifi_pass">Password: </label><br>
+								<input type="password" required name="wifi_pass"><br><br>
+								<input type="submit" value="Confirm">
+							</form>
+						</td>				
+					</tr>	
+				</table>
+				<hr>
+			</div>
+			<table class="iksweb">
+				<tbody>
+					<tr>
+						<td class="tdHead">Heap size:</td>
+						<td class="tdVal" id="heapSize">-</td>
+					</tr>
+					<tr>
+						<td class="tdHead">Free size:</td>
+						<td class="tdVal" id="freeSize">-</td>
+					</tr>
+					<tr>
+						<td colspan="2">
+							<progress id="pbFreeMem" max="100" value="50"></progress>
+							<div class="progress-value">45</div>
+						</td>
+					</tr>
+				</tbody>
+			</table>			
+		</div>		
+
 		<script>
+			var curTabName = "";
+			function openTab(evt, tabName) {
+				var i, tabcontent, tablinks;
+				tabcontent = document.getElementsByClassName("tabcontent");
+				for (i = 0; i < tabcontent.length; i++) {
+					tabcontent[i].style.display = "none";
+				}
+				tablinks = document.getElementsByClassName("tablinks");
+				for (i = 0; i < tablinks.length; i++) {
+					tablinks[i].className = tablinks[i].className.replace(" active", "");
+				}
+				document.getElementById(tabName).style.display = "block";
+				evt.currentTarget.className += " active";
+				curTabName = tabName;
+			}
+
+			// Get the element with id="defaultOpen" and click on it
+			document.getElementById("defaultOpen").click();
+
 			var xmlHttp = createXmlHttpObject();
 			var xmlHttpUpUpd = createXmlHttpObject();
 			function createXmlHttpObject() {
@@ -80,13 +126,14 @@
 					xmlHttp = new ActiveXObject('Microsoft.XMLHTTP');
 				}
 				return xmlHttp;
-			}
+			}			
 
 			function ut_to_str(ut) {
 				var d = Math.floor(ut / 86400);
 				var h = Math.floor(ut / 3600);
 				var m = Math.floor(ut / 60) - (h * 60);
 				var s = ut % 60;
+				pbVal = s;
 				return utStr = (d) + "." + 
 							   (h.toString().padStart(2, '0')) + ":" + 
 							   (m.toString().padStart(2, '0')) + ":" + 
@@ -100,12 +147,30 @@
 							xmlDoc = xmlHttpUpUpd.responseXML;
 							xmlmsg = xmlDoc.getElementsByTagName('uptime')[0].firstChild.nodeValue;
 							document.getElementById('uptime').innerHTML = ut_to_str(xmlmsg);
+							
+							var pbVal = 0;
+							var heapSize = 0;
+							var freeSize = 0;
+
+							xmlmsg = xmlDoc.getElementsByTagName('heapSize')[0].firstChild.nodeValue;
+							heapSize = xmlmsg;
+							document.getElementById('heapSize').innerHTML = heapSize;	
+
+							xmlmsg = xmlDoc.getElementsByTagName('freeHeap')[0].firstChild.nodeValue;
+							freeSize = xmlmsg;
+							document.getElementById('freeSize').innerHTML = freeSize;	
+
+							pbVal = 100.0 - (freeSize / (heapSize / 100.0));
+							
+							document.getElementById('pbFreeMem').value = pbVal;
 						}
 					}
-					xmlHttpUpUpd.open('PUT', 'xml', true);
-					xmlHttpUpUpd.send(null);
+					//if(curTabName == "Home") {
+						xmlHttpUpUpd.open('PUT', 'xml', true);
+						xmlHttpUpUpd.send(null);
+					//}
 				}
-				setTimeout('upTimeUpd()', 1000);	// таймаут запроса XML
+				setTimeout('upTimeUpd()', 200);	// таймаут запроса XML
 			}
 			
 			function process() {				
@@ -131,7 +196,6 @@
 					xmlHttp.send(null);
 				}
 				//setTimeout('process()', 1000);	// таймаут запроса XML
-				//upTimeUpd();
 			}	
 		
 			function push_butt(suf) {	
