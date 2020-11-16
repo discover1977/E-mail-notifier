@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <EEPROM.h>
-#include <ElegantOTA.h>
 #include <SPIFFS.h>
 #include <WebServer.h>
 #include <ESP32_MailClient.h>
@@ -8,6 +7,7 @@
 #include <FS.h>
 #include <SPIFFS.h>
 #include <ESP8266FtpServer.h>
+#include <ElegantOTA.h>
 
 #define CPU0  0
 #define CPU1  1
@@ -480,13 +480,15 @@ void led_flash(uint32_t colorCode) {
   for (int i = 0; i < 256; i++){
     FastLED.setBrightness(i);
     FastLED.show();
-    vTaskDelay(pdMS_TO_TICKS(1));
+    delay(2);
+    // vTaskDelay(pdMS_TO_TICKS(1));
   }
   vTaskDelay(pdMS_TO_TICKS(250));
   for (int i = 255; i > -1; i--) {
     FastLED.setBrightness(i);
     FastLED.show();
-    vTaskDelay(pdMS_TO_TICKS(1));
+    delay(2);
+    // vTaskDelay(pdMS_TO_TICKS(1));
   }
   for (int i = 0; i < 4; i++) leds[i].setColorCode(0x000000);
   FastLED.setBrightness(255);
