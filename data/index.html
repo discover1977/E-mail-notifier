@@ -74,6 +74,12 @@
 							</form>
 						</td>				
 					</tr>	
+					<tr>
+						<td>
+							<a href='/update'><button>Update...</button></a>
+							<button id='butReboot' value ='butReboot' type='button' onclick="push_butt(this.value)">Reboot</button>
+						</td>
+					</tr>
 				</table>
 				<hr>
 			</div>
@@ -89,8 +95,8 @@
 					</tr>
 					<tr>
 						<td colspan="2">
-							<progress id="pbFreeMem" max="100" value="50"></progress>
-							<div class="progress-value">45</div>
+							<progress id="pbFreeMem" max="100" value="0"></progress>
+							<div class="progress-value">0</div>
 						</td>
 					</tr>
 				</tbody>
@@ -165,12 +171,10 @@
 							document.getElementById('pbFreeMem').value = pbVal;
 						}
 					}
-					//if(curTabName == "Home") {
 						xmlHttpUpUpd.open('PUT', 'xml', true);
 						xmlHttpUpUpd.send(null);
-					//}
 				}
-				setTimeout('upTimeUpd()', 200);	// таймаут запроса XML
+				setTimeout('upTimeUpd()', 500);	// таймаут запроса XML
 			}
 			
 			function process() {				
