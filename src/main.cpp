@@ -8,6 +8,8 @@
 #include <SPIFFS.h>
 #include <ESP8266FtpServer.h>
 #include <ElegantOTA.h>
+#include <Adafruit_CCS811.h>
+#include <Wire.h>
 
 #define CPU0  0
 #define CPU1  1
@@ -36,7 +38,11 @@
 #define T_UPTIME_PRIOR      0
 #define T_UPTIME_STACK      1024
 
-TaskHandle_t th_WiFiConnect, th_WEBServer, th_EMailRead, th_LED, th_FTPSrv, th_UpTime;
+#define T_CC811_CPU         CPU0
+#define T_CC811_PRIOR       0
+#define T_CC811_STACK       2048
+
+TaskHandle_t th_WiFiConnect, th_WEBServer, th_EMailRead, th_LED, th_FTPSrv, th_UpTime, th_CC811;
 QueueHandle_t qh_EMailRead, qh_TestLED, qh_MsgCount;
 
 #define START_FCOLOR        0xFFFFFF
@@ -54,6 +60,7 @@ void task_EMailRead(void *param);
 void task_LED(void *param);
 void task_FTPSrv(void *param);
 void task_UpTimeCounter(void *param);
+void task_CC811(void *param);
 
 /* Прочие функции */
 void print_task_header(String taskName);
@@ -103,6 +110,10 @@ bool b_ftpEn = false;
 uint8_t ui8_MsgCount = 0;
 IMAPData imapData;
 uint32_t ui32_UpTime = 0;
+float f_Temperature = 0.0;
+float f_CO2 = 0.0;
+float f_TVOC = 0.0;
+bool b_CC811IsInit = false;
 
 #define NUM_LEDS 4
 #define LED_PIN 18
@@ -194,6 +205,48 @@ void task_UpTimeCounter(void *param) {
     yield();
     vTaskDelay(pdMS_TO_TICKS(1000));
     ui32_UpTime++;
+  }
+}
+
+void task_CC811(void *param) {
+  print_task_header("CC811");
+  Adafruit_CCS811 ccs;
+
+  yield();
+  if(!ccs.begin()) {
+    Serial.println("Failed to start CC811! Please check your wiring.");
+    vTaskSuspend(NULL);
+    return;
+  }
+  while(!ccs.available()) {
+    yield();
+    vTaskDelay(pdMS_TO_TICKS(100));
+  }
+  f_Temperature = ccs.calculateTemperature();
+  ccs.setTempOffset(f_Temperature - 25.0);
+
+  for(;;) {
+    yield();
+    if(ccs.available()) {
+      f_Temperature = ccs.calculateTemperature();
+      if(!ccs.readData()) {
+
+        Serial.print(F("eCO2: "));
+        f_CO2 = ccs.geteCO2();
+        Serial.print(f_CO2);
+        
+        Serial.print(F(" ppm, TVOC: "));      
+        f_TVOC = ccs.getTVOC();
+        Serial.print(f_TVOC);
+        
+        Serial.print(F(" ppb   Temp:"));
+        Serial.println(f_Temperature);
+      }
+      else {
+        Serial.println(F("CC811 ERROR!"));
+      }
+    }
+    vTaskDelay(pdMS_TO_TICKS(1000));
   }
 }
 
@@ -292,6 +345,9 @@ void task_WiFiConn(void* param) {
 
   vTaskSuspend(th_FTPSrv);
   print_task_state("FTPSrv", eTaskGetState(th_FTPSrv));
+
+  xTaskCreatePinnedToCore(task_CC811, "CC811", T_CC811_STACK, NULL, T_CC811_PRIOR, &th_CC811, T_CC811_CPU);
+  vTaskDelay(pdMS_TO_TICKS(10));  
 
   xQueueSend(qh_EMailRead, &b_EMailRead, portMAX_DELAY);
 
