@@ -122,6 +122,7 @@ typedef struct {
 } EMailData;
 
 void setup() {
+  EMailData rxED;
   Serial.begin(115200);
   Serial.println();
 
@@ -129,7 +130,7 @@ void setup() {
 
   qh_TestLED = xQueueCreate(1, sizeof(b_TestLED));
   qh_EMailRead = xQueueCreate(1, sizeof(b_EMailRead));
-  qh_MsgCount = xQueueCreate(1, sizeof(ui8_MsgCount));
+  qh_MsgCount = xQueueCreate(4, sizeof(rxED));
 
   xTaskCreatePinnedToCore(task_UpTimeCounter, "Up Time Counter", T_UPTIME_STACK, NULL, T_UPTIME_PRIOR, &th_UpTime, T_UPTIME_CPU);  
   vTaskDelay(pdMS_TO_TICKS(10));
@@ -183,6 +184,7 @@ void task_EMailRead(void *param) {
     for (txED.index = 0; txED.index < 4; txED.index++) {
       Serial.println("Reading: " + s_email[txED.index]);
       txED.count = readEmail(s_email_srv[txED.index], s_email[txED.index], s_email_pass[txED.index]);
+      xQueueSend(qh_MsgCount, &txED, portMAX_DELAY);
     }
   }
 }
