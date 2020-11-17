@@ -78,6 +78,7 @@ int readEmail(String email_srv, String email, String email_pass);
 void led_flash(uint32_t colorCode);
 void led_init();
 void print_task_state(String taskName, int state);
+void i2c_scaner();
 
 /* Обработчики WEB-запросов */
 void hw_Website();    
@@ -110,10 +111,8 @@ bool b_ftpEn = false;
 uint8_t ui8_MsgCount = 0;
 IMAPData imapData;
 uint32_t ui32_UpTime = 0;
-float f_Temperature = 0.0;
-float f_CO2 = 0.0;
-float f_TVOC = 0.0;
-bool b_CC811IsInit = false;
+uint16_t ui16_CO2 = 0.0;
+uint16_t ui16_TVOC = 0.0;
 
 #define NUM_LEDS 4
 #define LED_PIN 18
@@ -133,21 +132,18 @@ typedef struct {
 } EMailData;
 
 void setup() {
+  EMailData rxED;
   Serial.begin(115200);
-  Serial.println();
-
   Serial.println(F("--------------------------| START PROGRAMM |--------------------------"));
 
   qh_TestLED = xQueueCreate(1, sizeof(b_TestLED));
   qh_EMailRead = xQueueCreate(1, sizeof(b_EMailRead));
-  qh_MsgCount = xQueueCreate(1, sizeof(ui8_MsgCount));
+  qh_MsgCount = xQueueCreate(4, sizeof(rxED));  
 
   xTaskCreatePinnedToCore(task_UpTimeCounter, "Up Time Counter", T_UPTIME_STACK, NULL, T_UPTIME_PRIOR, &th_UpTime, T_UPTIME_CPU);  
   vTaskDelay(pdMS_TO_TICKS(10));
 
-  xTaskCreatePinnedToCore(task_LED, "LED", T_LED_STACK, NULL, T_LED_PRIOR, &th_LED, T_LED_CPU);  
-
-  Serial.println();    
+  xTaskCreatePinnedToCore(task_LED, "LED", T_LED_STACK, NULL, T_LED_PRIOR, &th_LED, T_LED_CPU);   
 };
 
 /*** TASKs ********************************************************************************************************************************/ 
@@ -194,6 +190,7 @@ void task_EMailRead(void *param) {
     for (txED.index = 0; txED.index < 4; txED.index++) {
       Serial.println("Reading: " + s_email[txED.index]);
       txED.count = readEmail(s_email_srv[txED.index], s_email[txED.index], s_email_pass[txED.index]);
+      xQueueSend(qh_MsgCount, &txED, portMAX_DELAY);
     }
   }
 }
@@ -211,9 +208,12 @@ void task_UpTimeCounter(void *param) {
 void task_CC811(void *param) {
   print_task_header("CC811");
   Adafruit_CCS811 ccs;
+  Wire.begin(SDA, SCL, 100000);
+
+  i2c_scaner();
 
   yield();
-  if(!ccs.begin()) {
+  if(!ccs.begin(0x5A)) {
     Serial.println("Failed to start CC811! Please check your wiring.");
     vTaskSuspend(NULL);
     return;
@@ -222,25 +222,19 @@ void task_CC811(void *param) {
     yield();
     vTaskDelay(pdMS_TO_TICKS(100));
   }
-  f_Temperature = ccs.calculateTemperature();
-  ccs.setTempOffset(f_Temperature - 25.0);
 
   for(;;) {
     yield();
     if(ccs.available()) {
-      f_Temperature = ccs.calculateTemperature();
       if(!ccs.readData()) {
 
         Serial.print(F("eCO2: "));
-        f_CO2 = ccs.geteCO2();
-        Serial.print(f_CO2);
+        ui16_CO2 = ccs.geteCO2();
+        Serial.print(ui16_CO2);
         
         Serial.print(F(" ppm, TVOC: "));      
-        f_TVOC = ccs.getTVOC();
-        Serial.print(f_TVOC);
-        
-        Serial.print(F(" ppb   Temp:"));
-        Serial.println(f_Temperature);
+        ui16_TVOC = ccs.getTVOC();
+        Serial.println(ui16_TVOC);
       }
       else {
         Serial.println(F("CC811 ERROR!"));
@@ -349,7 +343,7 @@ void task_WiFiConn(void* param) {
   xTaskCreatePinnedToCore(task_CC811, "CC811", T_CC811_STACK, NULL, T_CC811_PRIOR, &th_CC811, T_CC811_CPU);
   vTaskDelay(pdMS_TO_TICKS(10));  
 
-  xQueueSend(qh_EMailRead, &b_EMailRead, portMAX_DELAY);
+  //xQueueSend(qh_EMailRead, &b_EMailRead, portMAX_DELAY);
 
   vTaskDelete(NULL);
 }
@@ -537,14 +531,12 @@ void led_flash(uint32_t colorCode) {
     FastLED.setBrightness(i);
     FastLED.show();
     delay(2);
-    // vTaskDelay(pdMS_TO_TICKS(1));
   }
   vTaskDelay(pdMS_TO_TICKS(250));
   for (int i = 255; i > -1; i--) {
     FastLED.setBrightness(i);
     FastLED.show();
     delay(2);
-    // vTaskDelay(pdMS_TO_TICKS(1));
   }
   for (int i = 0; i < 4; i++) leds[i].setColorCode(0x000000);
   FastLED.setBrightness(255);
@@ -570,6 +562,37 @@ void print_task_state(String taskName, int state) {
   Serial.print(F(" state: "));
   Serial.println(tStae[state]);
 }
+
+void i2c_scaner() {
+  byte error, address;
+  int nDevices;
+ 
+  Serial.println("Scanning...");
+ 
+  nDevices = 0;
+  for(address = 1; address < 127; address++ ) {
+    // The i2c_scanner uses the return value of
+    // the Write.endTransmisstion to see if
+    // a device did acknowledge to the address.
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+ 
+    if (error == 0) {
+      Serial.print("I2C device found at address 0x");
+      if (address < 16) Serial.print("0");
+      Serial.print(address,HEX);
+      Serial.println("  !");
+      nDevices++;
+    } else if (error == 4) {
+      Serial.print("Unknown error at address 0x");
+      if (address < 16) Serial.print("0");
+      Serial.println(address,HEX);
+    }    
+  }
+  if (nDevices == 0) Serial.println("No I2C devices found\n");
+  else Serial.println("done\n");
+}
+
 
 void loop() {
   vTaskDelete(NULL);
