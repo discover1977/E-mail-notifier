@@ -81,6 +81,47 @@ table.iksweb th {
 	font-weight: normal;
 }
 
+.co2 {
+	font-size: 64px;
+	color: #20AA20;
+}
+
+.tvoc {
+	font-size: 64px;
+	color: #b0d2d8;
+}
+
+/*
+* Table Air quality
+*/
+table.AirTable{
+	all: none;
+	width: 100%;
+	border-collapse:collapse;
+	border-spacing:0;
+	height: auto;
+}
+table.AirTable,table.iksweb td, table.iksweb th {
+	-border: 1px solid #595959;
+}
+table.AirTable td,table.iksweb th {
+	padding: 4px;
+	width: 50%;
+	-text-align: right;
+	-height: 35px;
+}
+table.AirTable td.tdHead {
+	text-align: right;
+}
+table.AirTable td.tdVal {
+	text-align: left;
+}
+table.AirTable th {
+	background: #998f34; 
+	color: #fff; 
+	font-weight: normal;
+}
+
 /* Style the tab */
 .tab {
     overflow: hidden;

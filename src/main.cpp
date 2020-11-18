@@ -24,7 +24,7 @@
 
 #define T_WEBServer_CPU     CPU0
 #define T_WEBServer_PRIOR   0
-#define T_WEBServer_STACK   8192
+#define T_WEBServer_STACK   16384
 
 #define T_LED_CPU           CPU1
 #define T_LED_PRIOR         1
@@ -79,18 +79,22 @@ void led_flash(uint32_t colorCode);
 void led_init();
 void print_task_state(String taskName, int state);
 void i2c_scaner();
+void print_task_info(xTaskHandle thandle);
+uint16_t expRunningAverage(uint16_t newVal);
 
 /* Обработчики WEB-запросов */
-void hw_Website();    
-void hw_wifi_param(); 
-void hw_Email_param();
-void hw_pushButt();    
-void hw_WebRequests();       
-void hw_XML();
+void h_Website();    
+void h_wifi_param(); 
+void h_Email_param();
+void h_pushButt();  
+void handleWebRequests();  
+// void h_WebRequests();       
+void h_XML();
 
 /*
 * Global variables
 */
+const float k = 0.5;
 bool b_FWUpdate = false;
 bool b_EMailRead = false;
 const char cch_APssid[] = "E-mail";
@@ -151,12 +155,12 @@ void task_WEBServer(void* param) {
   print_task_header("WEB Server");
 
   // Регистрация обработчиков
-  server.on(F("/"), hw_Website);    
-  server.on(F("/wifi_param"), hw_wifi_param); 
-  server.on(F("/email_param"), hw_Email_param);
-  server.on(F("/pushButt"), hw_pushButt);    
-  server.onNotFound(hw_WebRequests);       
-  server.on(F("/xml"), hw_XML);
+  server.on(F("/"), h_Website);    
+  server.on(F("/wifi_param"), h_wifi_param); 
+  server.on(F("/email_param"), h_Email_param);
+  server.on(F("/pushButt"), HTTP_PUT, h_pushButt);    
+  server.onNotFound(handleWebRequests);       
+  server.on(F("/xml"), HTTP_PUT, h_XML);
 
   ElegantOTA.begin(&server); 
 
@@ -166,7 +170,8 @@ void task_WEBServer(void* param) {
     yield();
     /* Обработка запросов HTML клиента */
     server.handleClient();
-    vTaskDelay(pdMS_TO_TICKS(1));
+    delay(1);
+    // vTaskDelay(pdMS_TO_TICKS(1));
   }
 }
 
@@ -218,23 +223,18 @@ void task_CC811(void *param) {
     vTaskSuspend(NULL);
     return;
   }
+
   while(!ccs.available()) {
     yield();
-    vTaskDelay(pdMS_TO_TICKS(100));
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 
   for(;;) {
     yield();
     if(ccs.available()) {
-      if(!ccs.readData()) {
-
-        Serial.print(F("eCO2: "));
-        ui16_CO2 = ccs.geteCO2();
-        Serial.print(ui16_CO2);
-        
-        Serial.print(F(" ppm, TVOC: "));      
+      if(!ccs.readData()) {        
+        ui16_CO2 = expRunningAverage(ccs.geteCO2());
         ui16_TVOC = ccs.getTVOC();
-        Serial.println(ui16_TVOC);
       }
       else {
         Serial.println(F("CC811 ERROR!"));
@@ -469,6 +469,15 @@ String build_XML() {
   xmlStr += F("<heapSize>");
   xmlStr += ESP.getHeapSize();
   xmlStr += F("</heapSize>");
+
+  xmlStr += F("<co2>");
+  xmlStr += ui16_CO2;
+  xmlStr += F("</co2>");
+
+  xmlStr += F("<tvoc>");
+  xmlStr += ui16_TVOC;
+  xmlStr += F("</tvoc>");
+
   xmlStr += F("</xml>");
   return xmlStr;
 }
@@ -495,7 +504,9 @@ bool loadFromSpiffs(String path) {
   Serial.print(F("Load File: "));
   Serial.println(dataFile.name());
   if (server.hasArg(F("download"))) dataType = F("application/octet-stream");
-  if (server.streamFile(dataFile, dataType) != dataFile.size()) {}
+  if (server.streamFile(dataFile, dataType) != dataFile.size()) {
+    Serial.println(F("Write file size != dataFile.size() !!!"));
+  }
   dataFile.close();
   return true;
 }
@@ -563,6 +574,17 @@ void print_task_state(String taskName, int state) {
   Serial.println(tStae[state]);
 }
 
+void print_task_info(xTaskHandle thandle) {
+  
+}
+
+// бегущее среднее
+uint16_t expRunningAverage(uint16_t newVal) {
+  static float filVal = 0;
+  filVal += (newVal - filVal) * k;
+  return (uint16_t)filVal;
+}
+
 void i2c_scaner() {
   byte error, address;
   int nDevices;
@@ -601,11 +623,11 @@ void loop() {
 
 /* WEB Server handles *****************************************************************************/
 /* Обработчик запроса XML данных */
-void hw_XML() {
+void h_XML() {
   server.send(200, F("text/xml"), build_XML());
 }
 
-void hw_wifi_param() {
+void h_wifi_param() {
   Serial.println(F("h_wifi_param"));
   print_remote_IP();
   if(!server.authenticate(cch_web_user, cch_web_pass)) return server.requestAuthentication();
@@ -630,7 +652,7 @@ void hw_wifi_param() {
   ESP.restart();
 }
 
-void hw_Email_param() {
+void h_Email_param() {
   Serial.println(F("h_Email_param"));
   print_remote_IP();
   if(!server.authenticate(cch_web_user, cch_web_pass)) return server.requestAuthentication();
@@ -667,7 +689,7 @@ void hw_Email_param() {
   server.send(200, F("text/html"), F("Save E-mail accounts..."));
 }
 
-void hw_pushButt() {
+void h_pushButt() {
   Serial.println(F("h_pushButt"));
   print_remote_IP();
   if(!server.authenticate(cch_web_user, cch_web_pass)) return server.requestAuthentication();
@@ -690,7 +712,8 @@ void hw_pushButt() {
   server.send(200, F("text/xml"), build_XML());
 }
 
-void hw_WebRequests() {
+// void h_WebRequests() {
+void handleWebRequests() {
   Serial.println("h_WebRequests");
   print_remote_IP();
   if(!server.authenticate(cch_web_user, cch_web_pass)) return server.requestAuthentication();
@@ -715,7 +738,7 @@ void hw_WebRequests() {
 * Обработчик / handler запроса HTML страницы
 * Отправляет клиенту(браузеру) HTML страницу
 */
-void hw_Website() {
+void h_Website() {
   Serial.println("h_Website");
   print_remote_IP();
   if(!server.authenticate(cch_web_user, cch_web_pass)) return server.requestAuthentication();
