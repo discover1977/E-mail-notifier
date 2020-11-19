@@ -43,6 +43,8 @@ QueueHandle_t qh_EMailRead, qh_TestLED, qh_MsgCount;
 #define STA_MODE_FCOLOR     0x00FF00
 #define AP_MODE_FCOLOR      0xFFFF00
 
+#define FTP_TASK_TIMEOUT         600
+
 /* 
 * Заголовки функций
 */
@@ -103,6 +105,7 @@ bool b_ftpEn = false;
 uint8_t ui8_MsgCount = 0;
 IMAPData imapData;
 uint32_t ui32_UpTime = 0;
+uint16_t ui16_FTPTimeOut = 0;
 
 #define NUM_LEDS 4
 #define LED_PIN 18
@@ -166,11 +169,18 @@ void task_WEBServer(void* param) {
 
 void task_FTPSrv(void *param) {
   print_task_header("FTP Server");
+
+  print_task_state("WiFiConnect", eTaskGetState(th_WiFiConnect));
+
   FtpServer ftpSrv;
   ftpSrv.begin(cch_ftpUser, cch_ftpPass); 
   for(;;) {
     ftpSrv.handleFTP();
     vTaskDelay(pdMS_TO_TICKS(1));
+    if(ui16_FTPTimeOut == 0) {      
+      Serial.println(F("FTP server stopped!"));
+      vTaskSuspend(th_FTPSrv);
+    }
   }
 }
 
@@ -196,6 +206,7 @@ void task_UpTimeCounter(void *param) {
     yield();
     vTaskDelay(pdMS_TO_TICKS(1000));
     ui32_UpTime++;
+    if(ui16_FTPTimeOut > 0) ui16_FTPTimeOut--;
   }
 }
 
@@ -221,10 +232,12 @@ void task_LED(void *param) {
       if(b_TestLED) {
         for(uint8_t i = 0; i < 4; i++) leds[i].setColorCode(i_email_coli[i]);
         vTaskResume(th_FTPSrv);
+        ui16_FTPTimeOut = FTP_TASK_TIMEOUT;
         print_task_state("FTPSrv", eTaskGetState(th_FTPSrv));
       }
       else {
         for(uint8_t i = 0; i < 4; i++) leds[i].setRGB(0, 0, 0);
+        ui16_FTPTimeOut = 0;
         vTaskSuspend(th_FTPSrv);
         print_task_state("FTPSrv", eTaskGetState(th_FTPSrv));
       }
@@ -289,8 +302,6 @@ void task_WiFiConn(void* param) {
 
   xTaskCreatePinnedToCore(task_FTPSrv, "FTP", T_FTP_STACK, NULL, T_FTP_PRIOR, &th_FTPSrv, T_FTP_CPU);
   vTaskDelay(pdMS_TO_TICKS(10));  
-
-  print_task_state("WiFiConnect", eTaskGetState(th_WiFiConnect));
 
   vTaskSuspend(th_FTPSrv);
   print_task_state("FTPSrv", eTaskGetState(th_FTPSrv));
