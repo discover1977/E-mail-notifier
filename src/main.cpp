@@ -54,7 +54,7 @@ QueueHandle_t qh_EMailRead, qh_TestLED, qh_MsgCount;
 */
 
 /* Задачи */
-void task_WiFiConn(void* param);
+void task_WiFiConn(void *param);
 void task_WEBServer(void *param);
 void task_EMailRead(void *param);
 void task_LED(void *param);
@@ -78,8 +78,8 @@ int readEmail(String email_srv, String email, String email_pass);
 void led_flash(uint32_t colorCode);
 void led_init();
 void print_task_state(String taskName, int state);
+void print_task_info(xTaskHandle *tHandle);
 void i2c_scaner();
-void print_task_info(xTaskHandle thandle);
 uint16_t expRunningAverage(uint16_t newVal);
 
 /* Обработчики WEB-запросов */
@@ -87,8 +87,7 @@ void h_Website();
 void h_wifi_param(); 
 void h_Email_param();
 void h_pushButt();  
-void handleWebRequests();  
-// void h_WebRequests();       
+void h_WebRequests();       
 void h_XML();
 
 /*
@@ -159,7 +158,7 @@ void task_WEBServer(void* param) {
   server.on(F("/wifi_param"), h_wifi_param); 
   server.on(F("/email_param"), h_Email_param);
   server.on(F("/pushButt"), HTTP_PUT, h_pushButt);    
-  server.onNotFound(handleWebRequests);       
+  server.onNotFound(h_WebRequests);       
   server.on(F("/xml"), HTTP_PUT, h_XML);
 
   ElegantOTA.begin(&server); 
@@ -171,7 +170,6 @@ void task_WEBServer(void* param) {
     /* Обработка запросов HTML клиента */
     server.handleClient();
     delay(1);
-    // vTaskDelay(pdMS_TO_TICKS(1));
   }
 }
 
@@ -574,8 +572,37 @@ void print_task_state(String taskName, int state) {
   Serial.println(tStae[state]);
 }
 
-void print_task_info(xTaskHandle thandle) {
-  
+void print_task_info(xTaskHandle *tHandle) {
+  const String tStateStr[] = {"eRunning", "eReady", "eBlocked", "eSuspended", "eDeleted"};
+  const char taskStr[4] = {'T', 'a', 's', 'k'};
+  //TaskStatus_t xTaskDetails;
+
+  /*vTaskGetInfo( tHandle,
+              &xTaskDetails,
+              pdTRUE, // Include the high water mark in xTaskDetails.
+              eInvalid ); // Include the task state in xTaskDetails.*/
+
+  /*int strLenght = (taskName.length() <= 11)?(15):(taskName.length() + 4);
+  Serial.println();
+  for(int i = 0; i < strLenght; i++) {
+    if(i < 4) Serial.print(taskStr[i]);
+    else Serial.print(F("-"));
+  }
+  Serial.println();
+  Serial.print(F("| "));
+  Serial.print(taskName);
+  if(taskName.length() <= 11) {
+    for(int i = 0; i < 11 - taskName.length(); i++) Serial.print(F(" "));
+  }  
+  Serial.print(F(" |"));
+  Serial.println();
+  Serial.print(F("| "));
+  Serial.print(F("is running!"));
+  for(int i = 0; i < strLenght - 15; i++) Serial.print(F(" "));
+  Serial.print(F(" |"));
+  Serial.println();
+  for(int i = 0; i < strLenght; i++) Serial.print(F("-"));
+  Serial.println();*/
 }
 
 // бегущее среднее
@@ -713,7 +740,7 @@ void h_pushButt() {
 }
 
 // void h_WebRequests() {
-void handleWebRequests() {
+void h_WebRequests() {
   Serial.println("h_WebRequests");
   print_remote_IP();
   if(!server.authenticate(cch_web_user, cch_web_pass)) return server.requestAuthentication();
