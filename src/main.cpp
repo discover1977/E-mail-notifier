@@ -9,6 +9,7 @@
 #include <ESP8266FtpServer.h>
 #include <ElegantOTA.h>
 #include <Adafruit_CCS811.h>
+#include <Adafruit_Si7021.h>
 #include <Wire.h>
 
 #define CPU0  0
@@ -23,7 +24,7 @@
 #define T_EMailRead_STACK   8192
 
 #define T_WEBServer_CPU     CPU0
-#define T_WEBServer_PRIOR   0
+#define T_WEBServer_PRIOR   1
 #define T_WEBServer_STACK   16384
 
 #define T_LED_CPU           CPU1
@@ -42,7 +43,7 @@
 #define T_CC811_PRIOR       0
 #define T_CC811_STACK       2048
 
-TaskHandle_t th_WiFiConnect, th_WEBServer, th_EMailRead, th_LED, th_FTPSrv, th_UpTime, th_CC811;
+TaskHandle_t th_WiFiConnect, th_WEBServer, th_EMailRead, th_LED, th_FTPSrv, th_UpTime, th_ReadSensor;
 QueueHandle_t qh_EMailRead, qh_TestLED, qh_MsgCount;
 
 #define START_FCOLOR        0xFFFFFF
@@ -60,7 +61,7 @@ void task_EMailRead(void *param);
 void task_LED(void *param);
 void task_FTPSrv(void *param);
 void task_UpTimeCounter(void *param);
-void task_CC811(void *param);
+void task_ReadSensor(void *param);
 
 /* Прочие функции */
 void print_task_header(String taskName);
@@ -93,7 +94,7 @@ void h_XML();
 /*
 * Global variables
 */
-const float k = 0.5;
+const float k = 0.1;
 bool b_FWUpdate = false;
 bool b_EMailRead = false;
 const char cch_APssid[] = "E-mail";
@@ -114,8 +115,10 @@ bool b_ftpEn = false;
 uint8_t ui8_MsgCount = 0;
 IMAPData imapData;
 uint32_t ui32_UpTime = 0;
-uint16_t ui16_CO2 = 0.0;
-uint16_t ui16_TVOC = 0.0;
+uint16_t ui16_CO2 = 0;
+uint16_t ui16_TVOC = 0;
+float f_Temperature = 0.0;
+float f_Humidity = 0.0;
 
 #define NUM_LEDS 4
 #define LED_PIN 18
@@ -169,7 +172,7 @@ void task_WEBServer(void* param) {
     yield();
     /* Обработка запросов HTML клиента */
     server.handleClient();
-    delay(1);
+    vTaskDelay(1);
   }
 }
 
@@ -208,36 +211,54 @@ void task_UpTimeCounter(void *param) {
   }
 }
 
-void task_CC811(void *param) {
-  print_task_header("CC811");
-  Adafruit_CCS811 ccs;
+void task_ReadSensor(void *param) {
+  print_task_header("Read Sensor");
+  Adafruit_CCS811 cc811;
+  Adafruit_Si7021 si7021 = Adafruit_Si7021();
+  //bool b_HeatEn = false;
+  //uint8_t ui8_heatCnt = 0;
+
   Wire.begin(SDA, SCL, 100000);
 
   i2c_scaner();
 
   yield();
-  if(!ccs.begin(0x5A)) {
+  if(!cc811.begin(0x5A)) {
     Serial.println("Failed to start CC811! Please check your wiring.");
-    vTaskSuspend(NULL);
-    return;
   }
 
-  while(!ccs.available()) {
+  while(!cc811.available()) {
     yield();
     vTaskDelay(pdMS_TO_TICKS(10));
   }
-
+  
   for(;;) {
     yield();
-    if(ccs.available()) {
-      if(!ccs.readData()) {        
-        ui16_CO2 = expRunningAverage(ccs.geteCO2());
-        ui16_TVOC = ccs.getTVOC();
+    if(cc811.available()) {
+      if(!cc811.readData()) {        
+        ui16_CO2 = expRunningAverage(cc811.geteCO2());
+        ui16_TVOC = cc811.getTVOC();
+        cc811.setEnvironmentalData((uint8_t)f_Humidity, (double)f_Temperature);
       }
       else {
         Serial.println(F("CC811 ERROR!"));
       }
     }
+
+    f_Temperature = si7021.readTemperature();
+    f_Humidity = si7021.readHumidity();
+
+    // Toggle heater enabled state every 30 seconds
+    // An ~1.8 degC temperature increase can be noted when heater is enabled
+    /*if (++ui8_heatCnt == 10) {
+      b_HeatEn = !b_HeatEn;
+      si7021.heater(b_HeatEn);
+      Serial.print("Heater Enabled State: ");
+      if (si7021.isHeaterEnabled()) Serial.println("ENABLED");
+      else Serial.println("DISABLED");
+      ui8_heatCnt = 0;
+    }*/
+    
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
 }
@@ -338,7 +359,7 @@ void task_WiFiConn(void* param) {
   vTaskSuspend(th_FTPSrv);
   print_task_state("FTPSrv", eTaskGetState(th_FTPSrv));
 
-  xTaskCreatePinnedToCore(task_CC811, "CC811", T_CC811_STACK, NULL, T_CC811_PRIOR, &th_CC811, T_CC811_CPU);
+  xTaskCreatePinnedToCore(task_ReadSensor, "CC811", T_CC811_STACK, NULL, T_CC811_PRIOR, &th_ReadSensor, T_CC811_CPU);
   vTaskDelay(pdMS_TO_TICKS(10));  
 
   //xQueueSend(qh_EMailRead, &b_EMailRead, portMAX_DELAY);
@@ -475,6 +496,14 @@ String build_XML() {
   xmlStr += F("<tvoc>");
   xmlStr += ui16_TVOC;
   xmlStr += F("</tvoc>");
+
+  xmlStr += F("<temperature>");
+  xmlStr += f_Temperature;
+  xmlStr += F("</temperature>");
+
+  xmlStr += F("<humidity>");
+  xmlStr += f_Humidity;
+  xmlStr += F("</humidity>");
 
   xmlStr += F("</xml>");
   return xmlStr;
