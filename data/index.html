@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html>
-	<head>
-		<meta name = 'viewport' content='width=device-width' charset = "utf-8">
+	<head>		
+		<meta name = 'viewport' content='width=device-width' charset = "utf-8">		
+		<script async src = "gauge.min.js.gz"></script>
 		<!--<link rel = "stylesheet" type = "text/css" href = "main.css">-->
-		<!--<script src = "gauge.min.js.gz" onload = "initScriptedGauges()"></script>-->
-		<script src = "gauge.min.js.gz"></script>
+			
 		<style type="text/css">
 			* {box-sizing: border-box}
 
@@ -168,7 +168,7 @@
 				border-top: none;
 				color: #97bbdd;
 			}
-		</style>		
+		</style>
 	</head>
 
 	<body onload="process(); upTimeUpd();">
@@ -568,8 +568,8 @@
 					colorPlate: "rgba(60, 60, 60, 0)",
 					highlights: [
 						{
-							"from": 10,
-							"to": 50,
+							"from": 0,
+							"to": 100,
 							"color": "rgba(50, 50, 100, 0.75)"
 						}
 					],
@@ -591,5 +591,5 @@
 			}
 
 		</script>
-	</body>
+	</body>	
 </html> 
