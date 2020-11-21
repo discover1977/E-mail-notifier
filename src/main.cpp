@@ -43,14 +43,18 @@ QueueHandle_t qh_EMailRead, qh_TestLED, qh_MsgCount;
 #define STA_MODE_FCOLOR     0x00FF00
 #define AP_MODE_FCOLOR      0xFFFF00
 
-#define FTP_TASK_TIMEOUT         600
+#define FTP_TASK_TIMEOUT    600
+#define AP_SSID             "Notifier"
+#define AP_PASS             "0123456789"
+#define FTP_USER            "esp32"
+#define FTP_PASS            "esp32"
 
 /* 
 * Заголовки функций
 */
 
 /* Задачи */
-void task_WiFiConn(void* param);
+void task_WiFiConn(void *param);
 void task_WEBServer(void *param);
 void task_EMailRead(void *param);
 void task_LED(void *param);
@@ -228,7 +232,6 @@ void task_LED(void *param) {
     }
     qMsgRet = xQueueReceive(qh_TestLED, &b_TestLED, pdMS_TO_TICKS(10));
     if(qMsgRet == pdPASS) {
-
       if(b_TestLED) {
         for(uint8_t i = 0; i < 4; i++) leds[i].setColorCode(i_email_coli[i]);
         vTaskResume(th_FTPSrv);
