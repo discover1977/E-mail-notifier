@@ -29,7 +29,7 @@
 
 #define T_LED_CPU           CPU1
 #define T_LED_PRIOR         1
-#define T_LED_STACK         1024
+#define T_LED_STACK         2048
 
 #define T_FTP_CPU           CPU0
 #define T_FTP_PRIOR         0
@@ -111,13 +111,17 @@ String s_email_srv[4];
 String s_email_pass[4];
 String s_email_col[4];
 int i_email_coli[4];
+int i_email_count[4];
 bool b_TestLED = false;
-//uint8_t ui8_MsgCount = 0;
+bool b_FTPEn = false;
 uint32_t ui32_UpTime = 0;
 uint16_t ui16_CO2 = 0;
 uint16_t ui16_TVOC = 0;
 float f_Temperature = 0.0;
 float f_Humidity = 0.0;
+bool b_HeatSensor = false;
+String s_snackBarMsg = "";
+bool b_Restart = false;
 
 #define NUM_LEDS 4
 #define LED_PIN 18
@@ -191,12 +195,16 @@ void task_EMailRead(void *param) {
   print_task_header("Read E-mail Count");  
   EMailData txED;
   bool b_fread = false; 
+  String str;
   for (;;) {
     yield();
     xQueueReceive(qh_EMailRead, &b_fread, ((Param.interval == 0)?(30000):(Param.interval * 60000)));
     for (txED.index = 0; txED.index < 4; txED.index++) {
       Serial.println("Reading: " + s_email[txED.index]);
+      str = "Reading: " + s_email[txED.index];
+      s_snackBarMsg = str;
       txED.count = readEmail(s_email_srv[txED.index], s_email[txED.index], s_email_pass[txED.index]);
+      i_email_count[txED.index] = txED.count;
       xQueueSend(qh_MsgCount, &txED, portMAX_DELAY);
     }
   }
@@ -212,12 +220,13 @@ void task_UpTimeCounter(void *param) {
   }
 }
 
+#define HEAT_INTERVAL   300
+#define HEAT_DURATION   30
 void task_ReadSensor(void *param) {
   print_task_header("Read Sensor");
   Adafruit_CCS811 cc811;
   Adafruit_Si7021 si7021 = Adafruit_Si7021();
-  //bool b_HeatEn = false;
-  //uint8_t ui8_heatCnt = 0;
+  uint8_t ui8_heatCnt = 0;
 
   Wire.begin(SDA, SCL, 100000);
 
@@ -246,19 +255,18 @@ void task_ReadSensor(void *param) {
       }
     }
 
+    if(ui8_heatCnt == 0) {
+      si7021.heater(true);     
+      b_HeatSensor = true;
+    }
+    if(ui8_heatCnt == HEAT_DURATION) {
+      si7021.heater(false);
+      b_HeatSensor = false;
+    }
+    if(++ui8_heatCnt == HEAT_INTERVAL) ui8_heatCnt = 0;
+
     f_Temperature = si7021.readTemperature();
     f_Humidity = si7021.readHumidity();
-
-    // Toggle heater enabled state every 30 seconds
-    // An ~1.8 degC temperature increase can be noted when heater is enabled
-    /*if (++ui8_heatCnt == 10) {
-      b_HeatEn = !b_HeatEn;
-      si7021.heater(b_HeatEn);
-      Serial.print("Heater Enabled State: ");
-      if (si7021.isHeaterEnabled()) Serial.println("ENABLED");
-      else Serial.println("DISABLED");
-      ui8_heatCnt = 0;
-    }*/
     
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
@@ -271,11 +279,21 @@ void task_LED(void *param) {
   EMailData rxED;
   
   xTaskCreatePinnedToCore(task_WiFiConn, "WiFi Connect", T_WIFIConn_STACK, NULL, T_WIFIConn_PRIOR, &th_WiFiConnect, T_WIFIConn_CPU);
+  char txt[50];
 
   for(;;) {
     qMsgRet = xQueueReceive(qh_MsgCount, &rxED, pdMS_TO_TICKS(10));
     if(qMsgRet == pdPASS) {
-      if(rxED.count > 0) leds[rxED.index].setColorCode(i_email_coli[rxED.index]);
+      if(rxED.count > 0) {
+        Serial.println(F("-- Queue Receive MsgCount --"));
+        Serial.print(F("Index: ")); Serial.println(rxED.index);
+        Serial.print(F("Count: ")); Serial.println(rxED.count);
+        // Serial.print(F("Set color: ")); Serial.println(String(i_email_coli[rxED.index], HEX));
+        sprintf(txt, "0x%06X", i_email_coli[rxED.index]);
+        Serial.print(F("Set color: ")); Serial.println(txt);
+        Serial.println(F("----------------------------"));
+        leds[rxED.index].setColorCode(i_email_coli[rxED.index]);
+      }
       else leds[rxED.index].setRGB(0, 0, 0);
       FastLED.show();
     }
@@ -283,14 +301,18 @@ void task_LED(void *param) {
     if(qMsgRet == pdPASS) {
 
       if(b_TestLED) {
-        for(uint8_t i = 0; i < 4; i++) leds[i].setColorCode(i_email_coli[i]);
-        vTaskResume(th_FTPSrv);
-        print_task_state("FTPSrv", eTaskGetState(th_FTPSrv));
+        for(uint8_t i = 0; i < 4; i++) {
+          leds[i].setColorCode(i_email_coli[i]);
+          i_email_count[i] = 99;
+        }
+        s_snackBarMsg = "LED Test On";
       }
       else {
-        for(uint8_t i = 0; i < 4; i++) leds[i].setRGB(0, 0, 0);
-        vTaskSuspend(th_FTPSrv);
-        print_task_state("FTPSrv", eTaskGetState(th_FTPSrv));
+        for(uint8_t i = 0; i < 4; i++) {
+          leds[i].setRGB(0, 0, 0);
+          i_email_count[i] = 0;
+        }
+        s_snackBarMsg = "LED Test Off";
       }
       FastLED.show();
     }
@@ -483,6 +505,10 @@ String build_XML() {
     xmlStr += F("<email_col>");
     xmlStr += s_email_col[i];
     xmlStr += F("</email_col>");
+
+    xmlStr += F("<email_count>");
+    xmlStr += i_email_count[i];
+    xmlStr += F("</email_count>");
   }
   xmlStr += F("<freeHeap>");
   xmlStr += ESP.getFreeHeap();
@@ -507,7 +533,17 @@ String build_XML() {
   xmlStr += f_Humidity;
   xmlStr += F("</humidity>");
 
+  xmlStr += F("<heatSensor>");
+  xmlStr += b_HeatSensor;
+  xmlStr += F("</heatSensor>");
+
+  xmlStr += F("<snackBarMsg>");
+  xmlStr += s_snackBarMsg;
+  xmlStr += F("</snackBarMsg>");
+  s_snackBarMsg = "";
+
   xmlStr += F("</xml>");
+
   return xmlStr;
 }
 
@@ -604,39 +640,6 @@ void print_task_state(String taskName, int state) {
   Serial.println(tStae[state]);
 }
 
-void print_task_info(xTaskHandle *tHandle) {
-  const String tStateStr[] = {"eRunning", "eReady", "eBlocked", "eSuspended", "eDeleted"};
-  const char taskStr[4] = {'T', 'a', 's', 'k'};
-  //TaskStatus_t xTaskDetails;
-
-  /*vTaskGetInfo( tHandle,
-              &xTaskDetails,
-              pdTRUE, // Include the high water mark in xTaskDetails.
-              eInvalid ); // Include the task state in xTaskDetails.*/
-
-  /*int strLenght = (taskName.length() <= 11)?(15):(taskName.length() + 4);
-  Serial.println();
-  for(int i = 0; i < strLenght; i++) {
-    if(i < 4) Serial.print(taskStr[i]);
-    else Serial.print(F("-"));
-  }
-  Serial.println();
-  Serial.print(F("| "));
-  Serial.print(taskName);
-  if(taskName.length() <= 11) {
-    for(int i = 0; i < 11 - taskName.length(); i++) Serial.print(F(" "));
-  }  
-  Serial.print(F(" |"));
-  Serial.println();
-  Serial.print(F("| "));
-  Serial.print(F("is running!"));
-  for(int i = 0; i < strLenght - 15; i++) Serial.print(F(" "));
-  Serial.print(F(" |"));
-  Serial.println();
-  for(int i = 0; i < strLenght; i++) Serial.print(F("-"));
-  Serial.println();*/
-}
-
 // бегущее среднее
 uint16_t expRunningAverage(uint16_t newVal) {
   static float filVal = 0;
@@ -684,6 +687,9 @@ void loop() {
 /* Обработчик запроса XML данных */
 void h_XML() {
   server.send(200, F("text/xml"), build_XML());
+  if(b_Restart) {
+    ESP.restart();
+  }
 }
 
 void h_wifi_param() {
@@ -765,7 +771,21 @@ void h_pushButt() {
       xQueueSend(qh_TestLED, &b_TestLED, portMAX_DELAY);
     }
     if(server.arg(F("buttID")) == F("butReboot")) {
-      ESP.restart();
+      s_snackBarMsg = "Notifier will be rebooted!";
+      b_Restart = true;
+    }
+    if(server.arg(F("buttID")) == F("butFTPEn")) {
+      if(!b_FTPEn) {
+        b_FTPEn = true;
+        s_snackBarMsg = "FTP Enabled";
+        vTaskResume(th_FTPSrv);        
+      }
+      else {
+        b_FTPEn = false;
+        s_snackBarMsg = "FTP Disabled";
+        vTaskSuspend(th_FTPSrv);
+      }
+      print_task_state("FTPSrv", eTaskGetState(th_FTPSrv));
     }
   }
   server.send(200, F("text/xml"), build_XML());
