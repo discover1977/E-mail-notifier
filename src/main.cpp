@@ -26,7 +26,7 @@
 
 #define T_LED_CPU           CPU1
 #define T_LED_PRIOR         1
-#define T_LED_STACK         1024
+#define T_LED_STACK         2048
 
 #define T_FTP_CPU           CPU0
 #define T_FTP_PRIOR         0
@@ -43,7 +43,6 @@ QueueHandle_t qh_EMailRead, qh_TestLED, qh_MsgCount;
 #define STA_MODE_FCOLOR     0x00FF00
 #define AP_MODE_FCOLOR      0xFFFF00
 
-#define FTP_TASK_TIMEOUT    600
 #define AP_SSID             "Notifier"
 #define AP_PASS             "0123456789"
 #define FTP_USER            "esp32"
@@ -89,27 +88,21 @@ void hw_XML();
 /*
 * Global variables
 */
-bool b_FWUpdate = false;
-bool b_EMailRead = false;
-const char cch_APssid[] = "E-mail";
-const char cch_APpass[] = "1234567890";
 const char cch_web_user[] = "admin";
 const char cch_web_pass[] = "Notifier2020";
-const char cch_ftpUser[] = "esp32";
-const char cch_ftpPass[] = "esp32";
 WebServer server;
 String s_email[4];
 String s_email_srv[4];
 String s_email_pass[4];
 String s_email_col[4];
-String s_updStatusStr = "---";
 int i_email_coli[4];
+int i_email_count[4];
 bool b_TestLED = false;
-bool b_ftpEn = false;
-uint8_t ui8_MsgCount = 0;
-IMAPData imapData;
+bool b_FTPEn = false;
 uint32_t ui32_UpTime = 0;
-uint16_t ui16_FTPTimeOut = 0;
+String s_snackBarMsg = "";
+bool b_Restart = false;
+bool b_EMailRead = false;
 
 #define NUM_LEDS 4
 #define LED_PIN 18
@@ -173,18 +166,14 @@ void task_WEBServer(void* param) {
 
 void task_FTPSrv(void *param) {
   print_task_header("FTP Server");
-
   print_task_state("WiFiConnect", eTaskGetState(th_WiFiConnect));
-
   FtpServer ftpSrv;
+  const char cch_ftpUser[] = FTP_USER;
+  const char cch_ftpPass[] = FTP_PASS;
   ftpSrv.begin(cch_ftpUser, cch_ftpPass); 
   for(;;) {
     ftpSrv.handleFTP();
     vTaskDelay(pdMS_TO_TICKS(1));
-    if(ui16_FTPTimeOut == 0) {      
-      Serial.println(F("FTP server stopped!"));
-      vTaskSuspend(th_FTPSrv);
-    }
   }
 }
 
@@ -192,11 +181,14 @@ void task_EMailRead(void *param) {
   print_task_header("Read E-mail Count");  
   EMailData txED;
   bool b_fread = false; 
+  String str = "";
   for (;;) {
     yield();
     xQueueReceive(qh_EMailRead, &b_fread, ((Param.interval == 0)?(30000):(Param.interval * 60000)));
     for (txED.index = 0; txED.index < 4; txED.index++) {
       Serial.println("Reading: " + s_email[txED.index]);
+      str = "Reading: " + s_email[txED.index];
+      s_snackBarMsg = str;
       txED.count = readEmail(s_email_srv[txED.index], s_email[txED.index], s_email_pass[txED.index]);
       xQueueSend(qh_MsgCount, &txED, portMAX_DELAY);
     }
@@ -210,7 +202,6 @@ void task_UpTimeCounter(void *param) {
     yield();
     vTaskDelay(pdMS_TO_TICKS(1000));
     ui32_UpTime++;
-    if(ui16_FTPTimeOut > 0) ui16_FTPTimeOut--;
   }
 }
 
@@ -221,28 +212,40 @@ void task_LED(void *param) {
   EMailData rxED;
   
   xTaskCreatePinnedToCore(task_WiFiConn, "WiFi Connect", T_WIFIConn_STACK, NULL, T_WIFIConn_PRIOR, &th_WiFiConnect, T_WIFIConn_CPU);
+  char txt[50];
 
   for(;;) {
     qMsgRet = xQueueReceive(qh_MsgCount, &rxED, pdMS_TO_TICKS(10));
     if(qMsgRet == pdPASS) {
-      if(rxED.count > 0) leds[rxED.index].setColorCode(i_email_coli[rxED.index]);
+      if(rxED.count > 0) {
+        Serial.println(F("-- Queue Receive MsgCount --"));
+        Serial.print(F("Index: ")); Serial.println(rxED.index);
+        Serial.print(F("Count: ")); Serial.println(rxED.count);
+        // Serial.print(F("Set color: ")); Serial.println(String(i_email_coli[rxED.index], HEX));
+        sprintf(txt, "0x%06X", i_email_coli[rxED.index]);
+        Serial.print(F("Set color: ")); Serial.println(txt);
+        Serial.println(F("----------------------------"));
+        leds[rxED.index].setColorCode(i_email_coli[rxED.index]);
+      }
       else leds[rxED.index].setRGB(0, 0, 0);
       FastLED.show();
-      b_ftpEn = false;
     }
     qMsgRet = xQueueReceive(qh_TestLED, &b_TestLED, pdMS_TO_TICKS(10));
     if(qMsgRet == pdPASS) {
+
       if(b_TestLED) {
-        for(uint8_t i = 0; i < 4; i++) leds[i].setColorCode(i_email_coli[i]);
-        vTaskResume(th_FTPSrv);
-        ui16_FTPTimeOut = FTP_TASK_TIMEOUT;
-        print_task_state("FTPSrv", eTaskGetState(th_FTPSrv));
+        for(uint8_t i = 0; i < 4; i++) {
+          leds[i].setColorCode(i_email_coli[i]);
+          i_email_count[i] = 99;
+        }
+        s_snackBarMsg = "LED Test On";
       }
       else {
-        for(uint8_t i = 0; i < 4; i++) leds[i].setRGB(0, 0, 0);
-        ui16_FTPTimeOut = 0;
-        vTaskSuspend(th_FTPSrv);
-        print_task_state("FTPSrv", eTaskGetState(th_FTPSrv));
+        for(uint8_t i = 0; i < 4; i++) {
+          leds[i].setRGB(0, 0, 0);
+          i_email_count[i] = 0;
+        }
+        s_snackBarMsg = "LED Test Off";
       }
       FastLED.show();
     }
@@ -343,6 +346,8 @@ void print_task_header(String taskName) {
 }
 
 void ap_config() {
+  const char cch_APssid[] = AP_SSID;
+  const char cch_APpass[] = AP_PASS;
   Serial.println(F("Wi-Fi AP mode"));
   Serial.println(F("AP configuring..."));
   WiFi.mode(WIFI_AP);
@@ -428,6 +433,10 @@ String build_XML() {
     xmlStr += F("<email_col>");
     xmlStr += s_email_col[i];
     xmlStr += F("</email_col>");
+
+    xmlStr += F("<email_count>");
+    xmlStr += i_email_count[i];
+    xmlStr += F("</email_count>");
   }
   xmlStr += F("<freeHeap>");
   xmlStr += ESP.getFreeHeap();
@@ -435,6 +444,11 @@ String build_XML() {
   xmlStr += F("<heapSize>");
   xmlStr += ESP.getHeapSize();
   xmlStr += F("</heapSize>");
+  xmlStr += F("<snackBarMsg>");
+  xmlStr += s_snackBarMsg;
+  xmlStr += F("</snackBarMsg>");
+  s_snackBarMsg = "";
+
   xmlStr += F("</xml>");
   return xmlStr;
 }
@@ -479,6 +493,7 @@ void save_param() {
 }
 
 int readEmail(String email_srv, String email, String email_pass) {
+  IMAPData imapData;
   imapData.setFolder("INBOX");
   imapData.setSearchCriteria("UID SEARCH UNSEEN");
   imapData.setLogin(email_srv, 993, email, email_pass);
@@ -540,6 +555,9 @@ void loop() {
 /* Обработчик запроса XML данных */
 void hw_XML() {
   server.send(200, F("text/xml"), build_XML());
+  if(b_Restart) {
+    ESP.restart();
+  }
 }
 
 void hw_wifi_param() {
@@ -621,7 +639,21 @@ void hw_pushButt() {
       xQueueSend(qh_TestLED, &b_TestLED, portMAX_DELAY);
     }
     if(server.arg(F("buttID")) == F("butReboot")) {
-      ESP.restart();
+      s_snackBarMsg = "Notifier will be rebooted!";
+      b_Restart = true;
+    }
+    if(server.arg(F("buttID")) == F("butFTPEn")) {
+      if(!b_FTPEn) {
+        b_FTPEn = true;
+        s_snackBarMsg = "FTP Enabled";
+        vTaskResume(th_FTPSrv);        
+      }
+      else {
+        b_FTPEn = false;
+        s_snackBarMsg = "FTP Disabled";
+        vTaskSuspend(th_FTPSrv);
+      }
+      print_task_state("FTPSrv", eTaskGetState(th_FTPSrv));
     }
   }
   server.send(200, F("text/xml"), build_XML());

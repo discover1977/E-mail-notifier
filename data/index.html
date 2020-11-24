@@ -1,28 +1,299 @@
 <!DOCTYPE html>
 <html>
-	<head>
-		<meta name = 'viewport' content='width=device-width' charset = "utf-8">
-		<link rel = "stylesheet" type = "text/css" href = "main.css">
+	<head>		
+		<meta name = 'viewport' content='width=device-width' charset = "utf-8">		
+		<script async src = "gauge.min.js.gz"></script>
+		<!--<link rel = "stylesheet" type = "text/css" href = "main.css">-->
+			
+		<style type="text/css">
+			* {box-sizing: border-box}
+
+			/* The snackbar - position it at the bottom and in the middle of the screen */
+			#snackbar {
+				visibility: hidden; /* Hidden by default. Visible on click */
+				min-width: 250px; /* Set a default minimum width */
+				margin-left: -125px; /* Divide value of min-width by 2 */
+				background-color: #333; /* Black background color */
+				color: #fff; /* White text color */
+				text-align: center; /* Centered text */
+				border-radius: 2px; /* Rounded borders */
+				padding: 16px; /* Padding */
+				position: fixed; /* Sit on top of the screen */
+				z-index: 1; /* Add a z-index if needed */
+				left: 50%; /* Center the snackbar */
+				bottom: 30px; /* 30px from the bottom */
+			}
+
+			/* Show the snackbar when clicking on a button (class added with JavaScript) */
+			#snackbar.show {
+				visibility: visible; /* Show the snackbar */
+
+			/* Add animation: Take 0.5 seconds to fade in and out the snackbar. 
+			However, delay the fade out process for 2.5 seconds */
+				-webkit-animation: fadein 0.5s, fadeout 0.5s 2.5s;
+				animation: fadein 0.5s, fadeout 0.5s 2.5s;
+			}
+
+			/* Animations to fade the snackbar in and out */
+			@-webkit-keyframes fadein {
+				from {bottom: 0; opacity: 0;} 
+				to {bottom: 30px; opacity: 1;}
+			}
+
+			@keyframes fadein {
+				from {bottom: 0; opacity: 0;}
+				to {bottom: 30px; opacity: 1;}
+			}
+
+			@-webkit-keyframes fadeout {
+				from {bottom: 30px; opacity: 1;} 
+				to {bottom: 0; opacity: 0;}
+			}
+
+			@keyframes fadeout {
+				from {bottom: 30px; opacity: 1;}
+				to {bottom: 0; opacity: 0;}
+			}
+
+			.container {
+				max-width: 500px; /* Ширина элемента в пикселах */
+				-padding: 5px; /* Поля вокруг текста */
+				margin: auto; /* Выравниваем по центру */
+				-border: 1px solid #ccc;
+			}
+
+			/* Set height of body and the document to 100% */
+			body, html {
+				height: 100%;
+				margin: 0;
+				-padding: 8px;
+				font-family: Calibri;
+				background-color: #2e2e2e;
+			}
+			.input {
+				width: 100%;
+			}
+
+			table {
+				all: none;
+				-border: 1px solid grey;
+				border-collapse: collapse;	
+				color: #97bbdd;
+				width: 100%;
+			}
+			th, td {
+				-border: 1px solid grey;
+				padding: 2px;
+				text-align: center;	
+				-width: 33%;
+			}
+			th {
+				text-align: center;
+			}
+			tr {
+				padding: 2px;
+				vertical-align: middle;
+			}
+
+			progress {
+				font: 24px Arial, Tahoma, sans-serif;
+				position: relative;
+				overflow: hidden;
+				width: 100%;
+			}
+
+			.progress-value {
+				color: #333;
+				display: block;
+				line-height: 21px;
+				text-align: center;
+			}
+
+			.co2 {
+				font-size: 64px;
+				color: #20AA20;
+			}
+
+			.tvoc {
+				font-size: 64px;
+				color: #b0d2d8;
+			}
+
+			/* Style the tab */
+			.tab {
+				overflow: hidden;
+				border: 1px solid #ccc;
+				background-color: #f1f1f1;
+			}
+
+			/* Style the buttons inside the tab */
+			.tab button {
+				background-color: inherit;
+				float: left;
+				border: none;
+				outline: none;
+				cursor: pointer;
+				padding: 10px 10px;
+				transition: 0.5s;
+				font-size: 17px;
+				width: 50%;
+			}
+
+			/* Change background color of buttons on hover */
+			.tab button:hover {
+				background-color: #ddd;
+			}
+
+			/* Create an active/current tablink class */
+			.tab button.active {
+				background-color: #ccc;
+			}
+
+			/* Style the tab content */
+			.tabcontent {
+				display: none;
+				padding: 10px 10px;
+				-border: 1px solid #ccc;
+				border-top: none;
+				color: #97bbdd;
+			}
+
+			.butRead {
+				display: inline-block;
+				padding: 10px 10px;
+				font-size: 24px;
+				cursor: pointer;
+				text-align: center;
+				text-decoration: none;
+				outline: none;
+				color: #fff;
+				background-color: #578576;
+				border: none;
+				border-radius: 8px;
+				box-shadow: 0 4px #999;
+				width: 80%;
+			}
+			.butRead:hover {background-color: #346454}
+			.butRead:active {
+				background-color: #346454;
+				box-shadow: 0 2px #666;
+				transform: translateY(2px);
+			}
+			.butTest{
+				display: inline-block;
+				padding: 10px 10px;
+				font-size: 24px;
+				cursor: pointer;
+				text-align: center;
+				text-decoration: none;
+				outline: none;
+				color: #fff;
+				background-color: #b88230;
+				border: none;
+				border-radius: 8px;
+				box-shadow: 0 4px #999;
+				width: 80%;
+			}
+			.butTest:hover {background-color: #946928}
+			.butTest:active {
+				background-color: #946928;
+				box-shadow: 0 2px #666;
+				transform: translateY(2px);
+			}
+
+			.wifiCnf[type=submit] {
+				display: inline-block;
+				padding: 10px 10px;
+				font-size: 20px;
+				cursor: pointer;
+				text-align: center;
+				text-decoration: none;
+				outline: none;
+				color: #fff;
+				background-color: #4c6a72;
+				border: none;
+				border-radius: 8px;
+				box-shadow: 0 4px #999;
+				width: 50%;
+			}
+			.wifiCnf:hover {background-color: #2b444b}
+			.wifiCnf:active {
+				background-color: #2b444b;
+				box-shadow: 0 2px #666;
+				transform: translateY(2px);
+			}
+
+			.emailAccount[type=submit]{
+				color: #fff;
+				background-color: #4c6a72;
+				border: 3px solid 492d2d;	
+				width: 75%;
+				font-size: 18px;
+				border-radius: 8px;
+			}
+			.emailAccount:hover {background-color: #2b444b}
+			.emailAccount:active {
+				background-color: #2b444b;
+				box-shadow: 0 2px #666;
+				transform: translateY(2px);
+			}
+
+			.num[type="number"] {
+				width: 100%;
+				text-align: center;
+				font-size: 24px;
+			}
+
+			.mButt{
+				display: inline-block;
+				padding: 10px 10px;
+				font-size: 18px;
+				cursor: pointer;
+				text-align: center;
+				text-decoration: none;
+				outline: none;
+				color: #fff;
+				background-color: #4c6a72;
+				border: none;
+				border-radius: 8px;
+				box-shadow: 0 4px #999;
+				width: 75%;
+			}
+			.mButt:hover {background-color: #2b444b}
+			.mButt:active {
+				background-color: #2b444b;
+				box-shadow: 0 2px #666;
+				transform: translateY(2px);
+			}
+		</style>
 	</head>
 
-	<body onload="process(); upTimeUpd()">
+	<body onload="process(); upTimeUpd();">
 		<div class="container">
 			<div class="tab">
-				<button class="tablinks" onclick="openTab(event, 'Home')" id="defaultOpen">Home</button>
-				<button class="tablinks" onclick="openTab(event, 'E-mail')">E-mail</button>
-				<button class="tablinks" onclick="openTab(event, 'Wi-Fi')">Wi-Fi</button>
-			</div>
-	
-			<div id="Home" class="tabcontent">
-				<hr>
-				<p>Up time: </p>
-				<p id='uptime'>...</p>
-				<button id='butFRead' value ='butFRead' type='button' onclick="push_butt(this.value)">Force read</button>
-				<button id='butTestLED' value ='butTestLED' type='button' onclick="push_butt(this.value)">Test LED</button>
-				<hr>
+				<button class="tablinks" onclick="openTab(event, 'E-mail')" id="defaultOpen">E-mail</button>
+				<button class="tablinks" onclick="openTab(event, 'Setting')">Setting</button>
 			</div>
 	
 			<div id="E-mail" class="tabcontent">
+				<table>
+					<tr>
+						<td colspan="2" style="width: 100%; padding: 10px 0px;">
+							<canvas id='mail' width='150' height='105'>No canvas!!!</canvas>
+						</td>
+					</tr>
+					<tr>
+						<td style="width: 50%; padding: 10px 0px;">
+							<button class="butRead" id='butFRead' value ='butFRead' type='button' onclick="push_butt(this.value)">Read</button>
+						</td>
+						<td style="width: 50%; padding: 10px 0px;">
+							<button class="butTest" id='butTestLED' value ='butTestLED' type='button' onclick="push_butt(this.value)">Test</button>	
+						</td>
+					</tr>
+				</table>										
+			</div>
+		
+			<div id="Setting" class="tabcontent">
 				<form action="/email_param"  method="post">	
 					<fieldset>
 						<legend>E-mail 1</legend>
@@ -53,57 +324,170 @@
 						<input id="email_col4" type="color" name="email_col4">
 					</fieldset>	
 					<br>
-					<label for="interval">Interval: </label>
-					<input id="interval" type="number" name="interval" value="5" min="0" max="10">
-					<input type="submit" value="Save accounts">
+					<fieldset>
+						<legend>Check interval</legend>
+						<table>
+							<tr>
+								<td style="width: 25%;">
+									<input class="num" id="interval" type="number" name="interval" value="5" min="5" max="60">
+								</td>
+								<td style="width: 75%;">
+									<input class="emailAccount" type="submit" value="Save accounts">
+								</td>
+							</tr>
+						</table>												
+					</fieldset>
 				</form>
-			</div>
-	
-			<div id="Wi-Fi" class="tabcontent">
-				<hr>
-				<table>
-					<tr>
-						<td>							
-							AP Settings<br>
-							<form action="/wifi_param"  method="post">						
-								<label for="wifi_ssid">SSID: </label><br>
-								<input type="text" name="wifi_ssid" required value=""><br>
-								<label for="wifi_pass">Password: </label><br>
-								<input type="password" required name="wifi_pass"><br><br>
-								<input type="submit" value="Confirm">
-							</form>
-						</td>				
-					</tr>	
-					<tr>
-						<td>
-							<a href='/update'><button>Update...</button></a>
-							<button id='butReboot' value ='butReboot' type='button' onclick="push_butt(this.value)">Reboot</button>
-						</td>
-					</tr>
-				</table>
-				<hr>
-			</div>
-			<table class="iksweb">
-				<tbody>
-					<tr>
-						<td class="tdHead">Heap size:</td>
-						<td class="tdVal" id="heapSize">-</td>
-					</tr>
-					<tr>
-						<td class="tdHead">Free size:</td>
-						<td class="tdVal" id="freeSize">-</td>
-					</tr>
-					<tr>
-						<td colspan="2">
-							<progress id="pbFreeMem" max="100" value="0"></progress>
-							<div class="progress-value">0</div>
-						</td>
-					</tr>
-				</tbody>
-			</table>			
+				<br>
+				<fieldset>
+					<legend>Wi-Fi Settings</legend>
+					<form action="/wifi_param"  method="post">	
+						<table>
+							<tr>
+								<td style="width: 30%; text-align: right;">SSID:</td>
+								<td style="width: 70%; text-align: left;">
+									<input type="text" name="wifi_ssid" required value="">
+								</td>
+							</tr>
+							<tr>
+								<td style="width: 30%; text-align: right;">Password:</td>
+								<td style="width: 70%; text-align: left;">
+									<input type="password" required name="wifi_pass">
+								</td>
+							</tr>
+							<tr>
+								<td colspan="2">
+									<br>
+									<input class="wifiCnf" type="submit" value="Confirm">
+								</td>
+							</tr>
+						</table>
+					</form>
+				</fieldset>
+				<br>
+				<fieldset>
+					<legend>Maintenance</legend>
+					<table>
+						<tr>
+							<td style="width: 33.33%;">
+								<a href='/update'><button class="mButt">Update...</button></a>
+							</td>
+							<td style="width: 33.33%;">
+								<button class="mButt" id='butReboot' value ='butReboot' type='button' onclick="push_butt(this.value)">Reboot</button>
+							</td>
+							<td style="width: 33.33%;">
+								<button class="mButt" id='butFTPEn' value ='butFTPEn' type='button' onclick="push_butt(this.value)">FTP</button>
+							</td>
+						</tr>
+					</table>
+					<br>
+				</fieldset>
+			</div>		
+			<table>
+				<tr>
+					<td style="text-align: right; width: 50%;">
+						<p>Up time: </p>
+					</td>
+					<td style="text-align: left; color: burlywood;">
+						<p id='uptime'>...</p>	
+					</td>
+				</tr>
+			</table>
+			<div style="padding: 0px 10px;">				
+				<progress id="pbFreeMem" max="100" value="0"></progress>
+			</div>			
 		</div>		
 
 		<script>
+			var emailColor = [0, 0, 0, 0];
+
+			function drawMailBox(sector) {
+				var canvas = document.getElementById("mail");
+				var ctx = canvas.getContext('2d');
+				var offSet = 5;
+				var basicLineWidth = 5;	
+
+				// Down sector
+				ctx.beginPath();
+				if(sector[2] > 0) ctx.fillStyle = emailColor[2];	//"#20ff20";
+				else ctx.fillStyle = "#808080";
+				ctx.strokeStyle = "#DDDDDD";
+				ctx.lineWidth = basicLineWidth;
+				ctx.lineJoin = "round";			
+				ctx.moveTo(offSet, canvas.height - offSet);
+				ctx.lineTo(canvas.width - offSet, canvas.height - offSet);
+				ctx.lineTo(canvas.width / 2, canvas.height / 2 - 10);
+				ctx.lineTo(offSet, canvas.height - offSet);
+				ctx.closePath();
+				ctx.stroke();
+				ctx.fill();	
+				if((sector[2] > 0) && (sector[2] != 99)) {
+					ctx.fillStyle = "#555";
+					ctx.font = "10pt Calibri";
+    				ctx.fillText(sector[2], canvas.width / 2 - 10, canvas.height / 2 + 45);
+				}
+				
+				// Left sector
+				ctx.beginPath();
+				if(sector[3] > 0) ctx.fillStyle = emailColor[3];	//"#ffff20";
+				else ctx.fillStyle = "#808080";
+				ctx.strokeStyle = "#DDDDDD";
+				ctx.lineWidth = basicLineWidth;
+				ctx.lineJoin = "round";			
+				ctx.moveTo(offSet, offSet);
+				ctx.lineTo(offSet, canvas.height - offSet);
+				ctx.lineTo(canvas.width / 2 - 10, canvas.height / 2);
+				ctx.lineTo(offSet, offSet);
+				ctx.closePath();
+				ctx.stroke();
+				ctx.fill();
+				if((sector[3] > 0) && (sector[2] != 99)) {
+					ctx.fillStyle = "#555";
+					ctx.font = "10pt Calibri";
+    				ctx.fillText(sector[3], offSet + 20, canvas.height / 2 + 10);
+				}
+
+				// Right xector
+				ctx.beginPath();
+				if(sector[1] > 0) ctx.fillStyle = emailColor[1];	//"#2020ff";
+				else ctx.fillStyle = "#808080";
+				ctx.strokeStyle = "#DDDDDD";
+				ctx.lineWidth = basicLineWidth;
+				ctx.lineJoin = "round";			
+				ctx.moveTo(canvas.width - offSet, offSet);
+				ctx.lineTo(canvas.width - offSet, canvas.height - offSet);
+				ctx.lineTo(canvas.width / 2 + 10, canvas.height / 2);
+				ctx.lineTo(canvas.width - offSet, offSet);
+				ctx.closePath();
+				ctx.stroke();
+				ctx.fill();
+				if((sector[1] > 0) && (sector[2] != 99)) {
+					ctx.fillStyle = "#555";
+					ctx.font = "10pt Calibri";
+    				ctx.fillText(sector[1], canvas.width - offSet - 40, canvas.height / 2 + 10);
+				}
+				
+				// Up sector
+				ctx.beginPath();
+				if(sector[0] > 0) ctx.fillStyle = emailColor[0];	//"#ff2020";
+				else ctx.fillStyle = "#808080";
+				ctx.strokeStyle = "#DDDDDD";
+				ctx.lineWidth = basicLineWidth;
+				ctx.lineJoin = "round";			
+				ctx.moveTo(offSet, offSet);
+				ctx.lineTo(canvas.width / 2, canvas.height / 2 +  10);
+				ctx.lineTo(canvas.width - offSet, offSet);
+				ctx.lineTo(offSet, offSet);
+				ctx.closePath();
+				ctx.stroke();
+				ctx.fill();	
+				if((sector[0] > 0) && (sector[2] != 99)) {
+					ctx.fillStyle = "#555";
+					ctx.font = "10pt Calibri";
+    				ctx.fillText(sector[0], canvas.width / 2 - 10, 50);
+				}	
+			}				
+
 			var curTabName = "";
 			function openTab(evt, tabName) {
 				var i, tabcontent, tablinks;
@@ -157,27 +541,44 @@
 							var pbVal = 0;
 							var heapSize = 0;
 							var freeSize = 0;
+							let emailCount = [0, 0, 0, 0];
+
+							for(i = 0; i < 4; i++) {
+								xmlmsg = xmlDoc.getElementsByTagName('email_count')[i].firstChild.nodeValue;
+								emailCount[i] = xmlmsg;
+							}
+							drawMailBox(emailCount);
 
 							xmlmsg = xmlDoc.getElementsByTagName('heapSize')[0].firstChild.nodeValue;
 							heapSize = xmlmsg;
-							document.getElementById('heapSize').innerHTML = heapSize;	
 
 							xmlmsg = xmlDoc.getElementsByTagName('freeHeap')[0].firstChild.nodeValue;
 							freeSize = xmlmsg;
-							document.getElementById('freeSize').innerHTML = freeSize;	
 
-							pbVal = 100.0 - (freeSize / (heapSize / 100.0));
-							
+							pbVal = 100.0 - (freeSize / (heapSize / 100.0));							
 							document.getElementById('pbFreeMem').value = pbVal;
+
+							xmlmsg = xmlDoc.getElementsByTagName('snackBarMsg')[0].firstChild.nodeValue;
+							if(xmlmsg != "") {
+								snackbar(xmlmsg);
+							}
 						}
 					}
-						xmlHttpUpUpd.open('PUT', 'xml', true);
-						xmlHttpUpUpd.send(null);
+					xmlHttpUpUpd.open('PUT', 'xml', true);
+					xmlHttpUpUpd.send(null);
 				}
 				setTimeout('upTimeUpd()', 500);	// таймаут запроса XML
 			}
+
+			function snackbar(val) {
+				var x = document.getElementById("snackbar");
+				x.innerHTML = val
+				x.className = "show";
+				setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000);
+			}	
 			
-			function process() {				
+			function process() {		
+				drawMailBox([0, 0, 0, 0]);		
 				if((xmlHttp.readyState == 0) || (xmlHttp.readyState == 4)) {
 					xmlHttp.onreadystatechange = function() {
 						if((xmlHttp.readyState == 4) && (xmlHttp.status == 200)) {
@@ -191,6 +592,7 @@
 
 								xmlmsg = xmlDoc.getElementsByTagName('email_col')[i].firstChild.nodeValue;
 								document.getElementById('email_col' + (i + 1)).value = xmlmsg;	
+								emailColor[i] = xmlmsg;
 							}
 							xmlmsg = xmlDoc.getElementsByTagName('interval')[0].firstChild.nodeValue;
 							document.getElementById('interval').value = xmlmsg;
@@ -209,5 +611,6 @@
 				}
 			}
 		</script>
-	</body>
+		<div id="snackbar">---</div>
+	</body>	
 </html> 
