@@ -449,12 +449,7 @@
 				ctx.lineTo(offSet, canvas.height - offSet);
 				ctx.closePath();
 				ctx.stroke();
-				ctx.fill();	
-				if((sector[2] > 0) && (sector[2] != 99)) {
-					ctx.fillStyle = "#555";
-					ctx.font = "10pt Calibri";
-    				ctx.fillText(sector[2], canvas.width / 2 - 10, canvas.height / 2 + 45);
-				}
+				ctx.fill();
 				
 				// Left sector
 				ctx.beginPath();
@@ -470,11 +465,6 @@
 				ctx.closePath();
 				ctx.stroke();
 				ctx.fill();
-				if((sector[3] > 0) && (sector[2] != 99)) {
-					ctx.fillStyle = "#555";
-					ctx.font = "10pt Calibri";
-    				ctx.fillText(sector[3], offSet + 20, canvas.height / 2 + 10);
-				}
 
 				// Right xector
 				ctx.beginPath();
@@ -490,11 +480,6 @@
 				ctx.closePath();
 				ctx.stroke();
 				ctx.fill();
-				if((sector[1] > 0) && (sector[2] != 99)) {
-					ctx.fillStyle = "#555";
-					ctx.font = "10pt Calibri";
-    				ctx.fillText(sector[1], canvas.width - offSet - 40, canvas.height / 2 + 10);
-				}
 				
 				// Up sector
 				ctx.beginPath();
@@ -510,11 +495,6 @@
 				ctx.closePath();
 				ctx.stroke();
 				ctx.fill();	
-				if((sector[0] > 0) && (sector[2] != 99)) {
-					ctx.fillStyle = "#555";
-					ctx.font = "10pt Calibri";
-    				ctx.fillText(sector[0], canvas.width / 2 - 10, 50);
-				}	
 			}				
 
 			var curTabName = "";

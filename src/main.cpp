@@ -144,6 +144,8 @@ void setup() {
   EMailData rxED;
   Serial.begin(115200);
   Serial.println(F("--------------------------| START PROGRAMM |--------------------------"));
+  Serial.print(F("CPU freq: "));
+  Serial.println(ets_get_cpu_frequency());
 
   qh_TestLED = xQueueCreate(1, sizeof(b_TestLED));
   qh_EMailRead = xQueueCreate(1, sizeof(b_EMailRead));
@@ -199,11 +201,17 @@ void task_EMailRead(void *param) {
   for (;;) {
     yield();
     xQueueReceive(qh_EMailRead, &b_fread, ((Param.interval == 0)?(30000):(Param.interval * 60000)));
+    if(b_TestLED) {
+      b_TestLED = false;
+      s_snackBarMsg = "LED Test Off";
+      vTaskDelay(pdMS_TO_TICKS(2000));
+    }
     for (txED.index = 0; txED.index < 4; txED.index++) {
+      txED.count = readEmail(s_email_srv[txED.index], s_email[txED.index], s_email_pass[txED.index]);
       Serial.println("Reading: " + s_email[txED.index]);
       str = "Reading: " + s_email[txED.index];
       s_snackBarMsg = str;
-      txED.count = readEmail(s_email_srv[txED.index], s_email[txED.index], s_email_pass[txED.index]);
+      vTaskDelay(pdMS_TO_TICKS(2000));
       i_email_count[txED.index] = txED.count;
       xQueueSend(qh_MsgCount, &txED, portMAX_DELAY);
     }
