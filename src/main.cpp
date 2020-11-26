@@ -6,11 +6,14 @@
 #include <FastLED.h>
 #include <FS.h>
 #include <SPIFFS.h>
-#include <ESP8266FtpServer.h>
+//#include <ESP8266FtpServer.h>
 #include <ElegantOTA.h>
 #include <Adafruit_CCS811.h>
 #include <Adafruit_Si7021.h>
 #include <Wire.h>
+
+// My Class
+#include <tFTP.h>
 
 #define CPU0  0
 #define CPU1  1
@@ -31,10 +34,6 @@
 #define T_LED_PRIOR         1
 #define T_LED_STACK         2048
 
-#define T_FTP_CPU           CPU0
-#define T_FTP_PRIOR         0
-#define T_FTP_STACK         8192
-
 #define T_UPTIME_CPU        CPU1
 #define T_UPTIME_PRIOR      0
 #define T_UPTIME_STACK      1024
@@ -52,8 +51,6 @@ QueueHandle_t qh_EMailRead, qh_TestLED, qh_MsgCount;
 
 #define AP_SSID             "Notifier"
 #define AP_PASS             "0123456789"
-#define FTP_USER            "esp32"
-#define FTP_PASS            "esp32"
 
 /* 
 * Заголовки функций
@@ -64,7 +61,6 @@ void task_WiFiConn(void *param);
 void task_WEBServer(void *param);
 void task_EMailRead(void *param);
 void task_LED(void *param);
-void task_FTPSrv(void *param);
 void task_UpTimeCounter(void *param);
 void task_ReadSensor(void *param);
 
@@ -104,6 +100,9 @@ bool b_EMailRead = false;
 
 const char cch_web_user[] = "admin";
 const char cch_web_pass[] = "Notifier2020";
+
+// My Class
+TFTP tftp;
 
 WebServer server;
 String s_email[4];
@@ -178,18 +177,6 @@ void task_WEBServer(void* param) {
     /* Обработка запросов HTML клиента */
     server.handleClient();
     vTaskDelay(1);
-  }
-}
-
-void task_FTPSrv(void *param) {
-  print_task_header("FTP Server");
-  FtpServer ftpSrv;
-  const char cch_ftpUser[] = FTP_USER;
-  const char cch_ftpPass[] = FTP_PASS;
-  ftpSrv.begin(cch_ftpUser, cch_ftpPass); 
-  for(;;) {
-    ftpSrv.handleFTP();
-    vTaskDelay(pdMS_TO_TICKS(1));
   }
 }
 
@@ -381,18 +368,15 @@ void task_WiFiConn(void* param) {
   xTaskCreatePinnedToCore(task_EMailRead, "E-mail Read", T_EMailRead_STACK, NULL, T_EMailRead_PRIOR, &th_EMailRead, T_EMailRead_CPU);
   vTaskDelay(pdMS_TO_TICKS(10));
 
-  xTaskCreatePinnedToCore(task_FTPSrv, "FTP", T_FTP_STACK, NULL, T_FTP_PRIOR, &th_FTPSrv, T_FTP_CPU);
-  vTaskDelay(pdMS_TO_TICKS(10));  
-
   print_task_state("WiFiConnect", eTaskGetState(th_WiFiConnect));
 
+  /*xTaskCreatePinnedToCore(task_ReadSensor, "CC811", T_CC811_STACK, NULL, T_CC811_PRIOR, &th_ReadSensor, T_CC811_CPU);
+  vTaskDelay(pdMS_TO_TICKS(10));  */
+
+  th_FTPSrv = tftp.begin("esp32", "esp32");
+  vTaskDelay(pdMS_TO_TICKS(10)); 
   vTaskSuspend(th_FTPSrv);
-  print_task_state("FTPSrv", eTaskGetState(th_FTPSrv));
-
-  xTaskCreatePinnedToCore(task_ReadSensor, "CC811", T_CC811_STACK, NULL, T_CC811_PRIOR, &th_ReadSensor, T_CC811_CPU);
-  vTaskDelay(pdMS_TO_TICKS(10));  
-
-  //xQueueSend(qh_EMailRead, &b_EMailRead, portMAX_DELAY);
+  print_task_state(T_FTP_NAME, eTaskGetState(th_FTPSrv));
 
   vTaskDelete(NULL);
 }
@@ -799,7 +783,6 @@ void h_pushButt() {
   server.send(200, F("text/xml"), build_XML());
 }
 
-// void h_WebRequests() {
 void h_WebRequests() {
   Serial.println("h_WebRequests");
   print_remote_IP();
