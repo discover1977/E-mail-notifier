@@ -427,6 +427,8 @@ void task_WiFiConn(void* param) {
   else {
     Serial.println(F("Wi-Fi STA mode"));
     WiFi.mode(WIFI_STA);
+    Serial.print(F("STA SSID: ")); Serial.println(Param.ssid);
+    Serial.print(F("STA PASS: ")); Serial.println(Param.pass);
     WiFi.begin(Param.ssid, Param.pass);
     while (WiFi.status() != WL_CONNECTED) {      
       delay(190);
