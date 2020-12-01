@@ -55,6 +55,11 @@ QueueHandle_t qh_EMailRead, qh_TestLED, qh_MsgCount;
 #define FTP_USER            "esp32"
 #define FTP_PASS            "esp32"
 
+#define ALARM_CO2_8_INTERVAL    300
+#define ALARM_CO2_12_INTERVAL   60
+#define HEAT_INTERVAL   300
+#define HEAT_DURATION   30
+
 /* 
 * Заголовки функций
 */
@@ -122,6 +127,14 @@ float f_Humidity = 0.0;
 bool b_HeatSensor = false;
 String s_snackBarMsg = "";
 bool b_Restart = false;
+uint8_t testLEDCode = 0;
+
+enum eTestLEDCode {
+  LED_None,
+  LED_Test,
+  LED_CO2_8,
+  LED_CO2_12
+};
 
 #define NUM_LEDS 4
 #define LED_PIN 18
@@ -147,14 +160,14 @@ void setup() {
   Serial.print(F("CPU freq: "));
   Serial.println(ets_get_cpu_frequency());
 
-  qh_TestLED = xQueueCreate(1, sizeof(b_TestLED));
+  qh_TestLED = xQueueCreate(1, sizeof(testLEDCode));
   qh_EMailRead = xQueueCreate(1, sizeof(b_EMailRead));
   qh_MsgCount = xQueueCreate(4, sizeof(rxED));  
 
   xTaskCreatePinnedToCore(task_UpTimeCounter, "Up Time Counter", T_UPTIME_STACK, NULL, T_UPTIME_PRIOR, &th_UpTime, T_UPTIME_CPU);  
   vTaskDelay(pdMS_TO_TICKS(10));
 
-  xTaskCreatePinnedToCore(task_LED, "LED", T_LED_STACK, NULL, T_LED_PRIOR, &th_LED, T_LED_CPU);   
+  xTaskCreatePinnedToCore(task_LED, "LED", T_LED_STACK, NULL, T_LED_PRIOR, &th_LED, T_LED_CPU);     
 };
 
 /*** TASKs ********************************************************************************************************************************/ 
@@ -228,13 +241,12 @@ void task_UpTimeCounter(void *param) {
   }
 }
 
-#define HEAT_INTERVAL   300
-#define HEAT_DURATION   30
 void task_ReadSensor(void *param) {
   print_task_header("Read Sensor");
   Adafruit_CCS811 cc811;
   Adafruit_Si7021 si7021 = Adafruit_Si7021();
   uint8_t ui8_heatCnt = 0;
+  uint8_t ui8_sendCO2AlarmCnt = 0;
 
   Wire.begin(SDA, SCL, 100000);
 
@@ -261,7 +273,7 @@ void task_ReadSensor(void *param) {
       else {
         Serial.println(F("CC811 ERROR!"));
       }
-    }
+    }    
 
     if(ui8_heatCnt == 0) {
       si7021.heater(true);     
@@ -275,6 +287,23 @@ void task_ReadSensor(void *param) {
 
     f_Temperature = si7021.readTemperature();
     f_Humidity = si7021.readHumidity();
+
+    if(ui16_CO2 >= 1200) {
+      if(ui8_sendCO2AlarmCnt == 0) {
+        testLEDCode = LED_CO2_12;   
+        xQueueSend(qh_TestLED, &testLEDCode, portMAX_DELAY);
+        testLEDCode = LED_None;
+      }
+      if(++ui8_sendCO2AlarmCnt == ALARM_CO2_12_INTERVAL) ui8_sendCO2AlarmCnt = 0;
+    } else if(ui16_CO2 >= 800) {
+      if(ui8_sendCO2AlarmCnt == 0) {
+        testLEDCode = LED_CO2_8;       
+        xQueueSend(qh_TestLED, &testLEDCode, portMAX_DELAY);
+        testLEDCode = LED_None;
+      }
+      if(++ui8_sendCO2AlarmCnt == ALARM_CO2_12_INTERVAL) ui8_sendCO2AlarmCnt = 0;
+    }
+    else ui8_sendCO2AlarmCnt = 0;
     
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
@@ -290,7 +319,8 @@ void task_LED(void *param) {
   char txt[50];
 
   for(;;) {
-    qMsgRet = xQueueReceive(qh_MsgCount, &rxED, pdMS_TO_TICKS(10));
+    yield();
+    qMsgRet = xQueueReceive(qh_MsgCount, &rxED, pdMS_TO_TICKS(5));
     if(qMsgRet == pdPASS) {
       if(rxED.count > 0) {
         Serial.println(F("-- Queue Receive MsgCount --"));
@@ -305,24 +335,78 @@ void task_LED(void *param) {
       else leds[rxED.index].setRGB(0, 0, 0);
       FastLED.show();
     }
-    qMsgRet = xQueueReceive(qh_TestLED, &b_TestLED, pdMS_TO_TICKS(10));
+    qMsgRet = xQueueReceive(qh_TestLED, &testLEDCode, pdMS_TO_TICKS(5));
     if(qMsgRet == pdPASS) {
-
-      if(b_TestLED) {
-        for(uint8_t i = 0; i < 4; i++) {
-          leds[i].setColorCode(i_email_coli[i]);
-          i_email_count[i] = 99;
-        }
-        s_snackBarMsg = "LED Test On";
-      }
-      else {
-        for(uint8_t i = 0; i < 4; i++) {
-          leds[i].setRGB(0, 0, 0);
-          i_email_count[i] = 0;
-        }
-        s_snackBarMsg = "LED Test Off";
-      }
-      FastLED.show();
+      switch (testLEDCode) {
+        case LED_None : {
+          for(uint8_t i = 0; i < 4; i++) {
+            leds[i].setRGB(0, 0, 0);
+            i_email_count[i] = 0;
+          }
+          s_snackBarMsg = "LED Test Off";
+          FastLED.show();
+        }; break;
+        case LED_Test : {
+          for(uint8_t i = 0; i < 4; i++) {
+            leds[i].setColorCode(i_email_coli[i]);
+            i_email_count[i] = 99;
+          }
+          s_snackBarMsg = "LED Test On";
+          FastLED.show();
+        }; break;
+        case LED_CO2_8 : {
+          for(uint8_t i = 0; i < 4; i++) {
+            leds[0].setRGB(200, 200, 0);
+            leds[2].setRGB(200, 200, 0);
+            leds[1].setRGB(0, 0, 0);
+            leds[3].setRGB(0, 0, 0);
+            FastLED.show();
+            vTaskDelay(pdMS_TO_TICKS(250));
+            leds[1].setRGB(200, 200, 0);
+            leds[3].setRGB(200, 200, 0);
+            leds[0].setRGB(0, 0, 0);
+            leds[2].setRGB(0, 0, 0);    
+            FastLED.show();    
+            vTaskDelay(pdMS_TO_TICKS(250));          
+          }     
+          for(int i = 0; i < 4; i++) {
+            leds[i].setRGB(0, 0, 0); 
+            i_email_count[i] = 0;
+          }
+          FastLED.show();  
+          testLEDCode = LED_None;
+        }; break;
+        case LED_CO2_12 : {
+          for(uint8_t i = 0; i < 4; i++) {
+            leds[0].setRGB(200, 0, 0);
+            leds[2].setRGB(200, 0, 0);
+            leds[1].setRGB(0, 0, 0);
+            leds[3].setRGB(0, 0, 0);
+            FastLED.show();
+            vTaskDelay(pdMS_TO_TICKS(250));
+            leds[1].setRGB(200, 0, 0);
+            leds[3].setRGB(200, 0, 0);
+            leds[0].setRGB(0, 0, 0);
+            leds[2].setRGB(0, 0, 0);   
+            FastLED.show();     
+            vTaskDelay(pdMS_TO_TICKS(250));          
+          }    
+          for(int i = 0; i < 4; i++) {
+            leds[i].setRGB(0, 0, 0); 
+            i_email_count[i] = 0;
+          }
+          FastLED.show();  
+          testLEDCode = LED_None;
+        }; break;        
+        default: {
+          for(uint8_t i = 0; i < 4; i++) {
+            leds[i].setRGB(0, 0, 0);
+            i_email_count[i] = 0;
+          }
+          s_snackBarMsg = "LED Test Off";
+          FastLED.show();
+        }; break;
+      }      
     }
   }
 }
@@ -392,11 +476,8 @@ void task_WiFiConn(void* param) {
   xTaskCreatePinnedToCore(task_ReadSensor, "CC811", T_CC811_STACK, NULL, T_CC811_PRIOR, &th_ReadSensor, T_CC811_CPU);
   vTaskDelay(pdMS_TO_TICKS(10));  
 
-  //xQueueSend(qh_EMailRead, &b_EMailRead, portMAX_DELAY);
-
   vTaskDelete(NULL);
 }
-
 /*******************************************************************************************/
 
 /*-----------------------------------------------------------------------------------------*/
@@ -763,6 +844,7 @@ void h_Email_param() {
 }
 
 void h_pushButt() {
+  static uint8_t ledCode = LED_None;
   Serial.println(F("h_pushButt"));
   print_remote_IP();
   if(!server.authenticate(cch_web_user, cch_web_pass)) return server.requestAuthentication();
@@ -775,8 +857,9 @@ void h_pushButt() {
       xQueueSend(qh_EMailRead, &b_EMailRead, portMAX_DELAY);
     }
     if(server.arg(F("buttID")) == F("butTestLED")) {
-      b_TestLED = !b_TestLED;      
-      xQueueSend(qh_TestLED, &b_TestLED, portMAX_DELAY);
+      if(testLEDCode == LED_None) testLEDCode = LED_Test;
+      else testLEDCode = LED_None;
+      xQueueSend(qh_TestLED, &testLEDCode, portMAX_DELAY);
     }
     if(server.arg(F("buttID")) == F("butReboot")) {
       s_snackBarMsg = "Notifier will be rebooted!";
