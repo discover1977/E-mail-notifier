@@ -12,6 +12,8 @@
 #include <Adafruit_Si7021.h>
 #include <Wire.h>
 
+#define FW_VERSION          "2.0"
+
 #define CPU0  0
 #define CPU1  1
 
@@ -20,15 +22,15 @@
 #define T_WIFIConn_STACK    2048
 
 #define T_EMailRead_CPU     CPU1
-#define T_EMailRead_PRIOR   2
+#define T_EMailRead_PRIOR   0
 #define T_EMailRead_STACK   8192
 
 #define T_WEBServer_CPU     CPU0
-#define T_WEBServer_PRIOR   1
+#define T_WEBServer_PRIOR   0
 #define T_WEBServer_STACK   16384
 
 #define T_LED_CPU           CPU1
-#define T_LED_PRIOR         1
+#define T_LED_PRIOR         0
 #define T_LED_STACK         2048
 
 #define T_FTP_CPU           CPU0
@@ -75,7 +77,6 @@ void task_ReadSensor(void *param);
 
 /* Прочие функции */
 void print_task_header(String taskName);
-void eeprom_init();
 void ap_config();
 void eeprom_init();
 void read_accounts(String file);
@@ -128,6 +129,7 @@ bool b_HeatSensor = false;
 String s_snackBarMsg = "";
 bool b_Restart = false;
 uint8_t testLEDCode = 0;
+const String fwVersion = FW_VERSION;
 
 enum eTestLEDCode {
   LED_None,
@@ -301,7 +303,7 @@ void task_ReadSensor(void *param) {
         xQueueSend(qh_TestLED, &testLEDCode, portMAX_DELAY);
         testLEDCode = LED_None;
       }
-      if(++ui8_sendCO2AlarmCnt == ALARM_CO2_12_INTERVAL) ui8_sendCO2AlarmCnt = 0;
+      if(++ui8_sendCO2AlarmCnt == ALARM_CO2_8_INTERVAL) ui8_sendCO2AlarmCnt = 0;
     }
     else ui8_sendCO2AlarmCnt = 0;
     
@@ -314,19 +316,19 @@ void task_LED(void *param) {
   led_init();
   BaseType_t qMsgRet;
   EMailData rxED;
+  CRGB tmpLed[4];
   
   xTaskCreatePinnedToCore(task_WiFiConn, "WiFi Connect", T_WIFIConn_STACK, NULL, T_WIFIConn_PRIOR, &th_WiFiConnect, T_WIFIConn_CPU);
   char txt[50];
 
   for(;;) {
     yield();
-    qMsgRet = xQueueReceive(qh_MsgCount, &rxED, pdMS_TO_TICKS(5));
+    qMsgRet = xQueueReceive(qh_MsgCount, &rxED, 5);
     if(qMsgRet == pdPASS) {
       if(rxED.count > 0) {
         Serial.println(F("-- Queue Receive MsgCount --"));
         Serial.print(F("Index: ")); Serial.println(rxED.index);
         Serial.print(F("Count: ")); Serial.println(rxED.count);
-        // Serial.print(F("Set color: ")); Serial.println(String(i_email_coli[rxED.index], HEX));
         sprintf(txt, "0x%06X", i_email_coli[rxED.index]);
         Serial.print(F("Set color: ")); Serial.println(txt);
         Serial.println(F("----------------------------"));
@@ -335,8 +337,9 @@ void task_LED(void *param) {
       else leds[rxED.index].setRGB(0, 0, 0);
       FastLED.show();
     }
-    qMsgRet = xQueueReceive(qh_TestLED, &testLEDCode, pdMS_TO_TICKS(5));
+    qMsgRet = xQueueReceive(qh_TestLED, &testLEDCode, 5);
     if(qMsgRet == pdPASS) {
+      for(int i = 0; i < 4; i++) tmpLed[i] = leds[i];
       switch (testLEDCode) {
         case LED_None : {
           for(uint8_t i = 0; i < 4; i++) {
@@ -373,6 +376,7 @@ void task_LED(void *param) {
             leds[i].setRGB(0, 0, 0); 
             i_email_count[i] = 0;
           }
+          for(int i = 0; i < 4; i++) leds[i] = tmpLed[i];
           FastLED.show();  
           testLEDCode = LED_None;
         }; break;
@@ -395,6 +399,7 @@ void task_LED(void *param) {
             leds[i].setRGB(0, 0, 0); 
             i_email_count[i] = 0;
           }
+          for(int i = 0; i < 4; i++) leds[i] = tmpLed[i];
           FastLED.show();  
           testLEDCode = LED_None;
         }; break;        
@@ -407,6 +412,8 @@ void task_LED(void *param) {
           FastLED.show();
         }; break;
       }      
+      //for(int i = 0; i < 4; i++) leds[i] = tmpLed[i];
+      //FastLED.show();
     }
   }
 }
@@ -427,6 +434,7 @@ void task_WiFiConn(void* param) {
   else {
     Serial.println(F("Wi-Fi STA mode"));
     WiFi.mode(WIFI_STA);
+    Serial.print(F("MAC address: ")); Serial.println(WiFi.macAddress());
     Serial.print(F("STA SSID: ")); Serial.println(Param.ssid);
     Serial.print(F("STA PASS: ")); Serial.println(Param.pass);
     WiFi.begin(Param.ssid, Param.pass);
@@ -632,6 +640,10 @@ String build_XML() {
   xmlStr += s_snackBarMsg;
   xmlStr += F("</snackBarMsg>");
   s_snackBarMsg = "";
+
+  xmlStr += F("<fwVer>");
+  xmlStr += fwVersion;
+  xmlStr += F("</fwVer>");
 
   xmlStr += F("</xml>");
 
@@ -846,7 +858,6 @@ void h_Email_param() {
 }
 
 void h_pushButt() {
-  static uint8_t ledCode = LED_None;
   Serial.println(F("h_pushButt"));
   print_remote_IP();
   if(!server.authenticate(cch_web_user, cch_web_pass)) return server.requestAuthentication();
