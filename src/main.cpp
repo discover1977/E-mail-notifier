@@ -9,6 +9,8 @@
 #include <ESP8266FtpServer.h>
 #include <ElegantOTA.h>
 
+#define FW_VERSION          "2.1"
+
 #define CPU0  0
 #define CPU1  1
 
@@ -17,15 +19,15 @@
 #define T_WIFIConn_STACK    2048
 
 #define T_EMailRead_CPU     CPU1
-#define T_EMailRead_PRIOR   2
+#define T_EMailRead_PRIOR   0
 #define T_EMailRead_STACK   8192
 
 #define T_WEBServer_CPU     CPU0
 #define T_WEBServer_PRIOR   0
-#define T_WEBServer_STACK   8192
+#define T_WEBServer_STACK   16384
 
 #define T_LED_CPU           CPU1
-#define T_LED_PRIOR         1
+#define T_LED_PRIOR         0
 #define T_LED_STACK         2048
 
 #define T_FTP_CPU           CPU0
@@ -100,9 +102,11 @@ int i_email_count[4];
 bool b_TestLED = false;
 bool b_FTPEn = false;
 uint32_t ui32_UpTime = 0;
-String s_snackBarMsg = "";
+String s_snackBarMsg = "...";
 bool b_Restart = false;
 bool b_EMailRead = false;
+uint8_t testLEDCode = 0;
+const String fwVersion = FW_VERSION;
 
 #define NUM_LEDS 4
 #define LED_PIN 18
@@ -455,7 +459,11 @@ String build_XML() {
   xmlStr += F("<snackBarMsg>");
   xmlStr += s_snackBarMsg;
   xmlStr += F("</snackBarMsg>");
-  s_snackBarMsg = "";
+  s_snackBarMsg = "...";
+
+  xmlStr += F("<fwVer>");
+  xmlStr += fwVersion;
+  xmlStr += F("</fwVer>");
 
   xmlStr += F("</xml>");
   return xmlStr;

@@ -1,9 +1,7 @@
 <!DOCTYPE html>
 <html>
 	<head>		
-		<meta name = 'viewport' content='width=device-width' charset = "utf-8">		
-		<script async src = "gauge.min.js.gz"></script>
-		<!--<link rel = "stylesheet" type = "text/css" href = "main.css">-->
+		<meta name = 'viewport' content='width=device-width' charset = "utf-8">
 			
 		<style type="text/css">
 			* {box-sizing: border-box}
@@ -322,8 +320,7 @@
 						<input class="input" id="email_srv4" type="text" name="email_srv4" placeholder='E-mail server'>
 						<input class="input" id="email_pass4" type="password" name="email_pass4" autocomplete="on" placeholder='E-mail password'>
 						<input id="email_col4" type="color" name="email_col4">
-					</fieldset>	
-					<br>
+					</fieldset>
 					<fieldset>
 						<legend>Check interval</legend>
 						<table>
@@ -338,7 +335,6 @@
 						</table>												
 					</fieldset>
 				</form>
-				<br>
 				<fieldset>
 					<legend>Wi-Fi Settings</legend>
 					<form action="/wifi_param"  method="post">	
@@ -364,7 +360,6 @@
 						</table>
 					</form>
 				</fieldset>
-				<br>
 				<fieldset>
 					<legend>Maintenance</legend>
 					<table>
@@ -380,17 +375,22 @@
 							</td>
 						</tr>
 					</table>
-					<br>
 				</fieldset>
 			</div>		
 			<table>
 				<tr>
-					<td style="text-align: right; width: 50%;">
+					<td style="text-align: right; width: 25%;">
 						<p>Up time: </p>
 					</td>
-					<td style="text-align: left; color: burlywood;">
+					<td style="text-align: left; width: 25%; color: burlywood;">
 						<p id='uptime'>...</p>	
 					</td>
+					<td style="text-align: right; width: 25%;">
+						<p>FW version: </p>
+					</td>
+					<td style="text-align: left; width: 25%; color: burlywood;">
+						<p id='fwVer'>...</p>	
+					</td>					
 				</tr>
 			</table>
 			<div style="padding: 0px 10px;">				
@@ -539,7 +539,7 @@
 							document.getElementById('pbFreeMem').value = pbVal;
 
 							xmlmsg = xmlDoc.getElementsByTagName('snackBarMsg')[0].firstChild.nodeValue;
-							if(xmlmsg != "") {
+							if(xmlmsg != "...") {
 								snackbar(xmlmsg);
 							}
 						}
@@ -564,18 +564,28 @@
 						if((xmlHttp.readyState == 4) && (xmlHttp.status == 200)) {
 							xmlDoc = xmlHttp.responseXML;
 							for(i = 0; i < 4; i++) {
-								xmlmsg = xmlDoc.getElementsByTagName('email')[i].firstChild.nodeValue;
-								document.getElementById('email' + (i + 1)).value = xmlmsg;
+								try {
+									xmlmsg = xmlDoc.getElementsByTagName('email')[i].firstChild.nodeValue;
+									document.getElementById('email' + (i + 1)).value = xmlmsg;
+								} catch (error) {console.log(error)}
 
-								xmlmsg = xmlDoc.getElementsByTagName('email_srv')[i].firstChild.nodeValue;
-								document.getElementById('email_srv' + (i + 1)).value = xmlmsg;	
+								try {
+									xmlmsg = xmlDoc.getElementsByTagName('email_srv')[i].firstChild.nodeValue;
+									document.getElementById('email_srv' + (i + 1)).value = xmlmsg;		
+								} catch (error) {console.log(error)}
 
-								xmlmsg = xmlDoc.getElementsByTagName('email_col')[i].firstChild.nodeValue;
-								document.getElementById('email_col' + (i + 1)).value = xmlmsg;	
-								emailColor[i] = xmlmsg;
+								try {
+									xmlmsg = xmlDoc.getElementsByTagName('email_col')[i].firstChild.nodeValue;
+									document.getElementById('email_col' + (i + 1)).value = xmlmsg;	
+									emailColor[i] = xmlmsg;
+								} catch (error) {console.log(error)}
+
 							}
 							xmlmsg = xmlDoc.getElementsByTagName('interval')[0].firstChild.nodeValue;
 							document.getElementById('interval').value = xmlmsg;
+
+							xmlmsg = xmlDoc.getElementsByTagName('fwVer')[0].firstChild.nodeValue;
+							document.getElementById('fwVer').innerHTML = xmlmsg;
 						}
 					}
 					xmlHttp.open('PUT', 'xml', true);
