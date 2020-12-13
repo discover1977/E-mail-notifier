@@ -8,8 +8,9 @@
 #include <SPIFFS.h>
 #include <ESP8266FtpServer.h>
 #include <ElegantOTA.h>
+#include <DNSServer.h>
 
-#define FW_VERSION          "2.1"
+#define FW_VERSION          "2.2"
 
 #define CPU0  0
 #define CPU1  1
@@ -107,6 +108,7 @@ bool b_Restart = false;
 bool b_EMailRead = false;
 uint8_t testLEDCode = 0;
 const String fwVersion = FW_VERSION;
+IPAddress myIP;
 
 #define NUM_LEDS 4
 #define LED_PIN 18
@@ -148,6 +150,9 @@ void setup() {
 void task_WEBServer(void* param) {
   print_task_header("WEB Server");
 
+  DNSServer dnsServer;
+  const char *server_name = "www.notifier.net";
+
   // Регистрация обработчиков
   server.on(F("/"), hw_Website);    
   server.on(F("/wifi_param"), hw_wifi_param); 
@@ -159,12 +164,15 @@ void task_WEBServer(void* param) {
   ElegantOTA.begin(&server); 
 
   server.begin();  
+  const byte DNS_PORT = 53;
+  Serial.print(F("IP for DNS: ")); Serial.println(myIP);
+  dnsServer.start(DNS_PORT, server_name, myIP);
 
   for (;;) {
     yield();
     /* Обработка запросов HTML клиента */
+    dnsServer.processNextRequest();
     server.handleClient();
-    vTaskDelay(pdMS_TO_TICKS(1));
   }
 }
 
@@ -176,8 +184,8 @@ void task_FTPSrv(void *param) {
   const char cch_ftpPass[] = FTP_PASS;
   ftpSrv.begin(cch_ftpUser, cch_ftpPass); 
   for(;;) {
+    yield();
     ftpSrv.handleFTP();
-    vTaskDelay(pdMS_TO_TICKS(1));
   }
 }
 
@@ -224,27 +232,20 @@ void task_LED(void *param) {
   EMailData rxED;
   
   xTaskCreatePinnedToCore(task_WiFiConn, "WiFi Connect", T_WIFIConn_STACK, NULL, T_WIFIConn_PRIOR, &th_WiFiConnect, T_WIFIConn_CPU);
-  char txt[50];
 
   for(;;) {
-    qMsgRet = xQueueReceive(qh_MsgCount, &rxED, pdMS_TO_TICKS(10));
+    yield();
+    qMsgRet = xQueueReceive(qh_MsgCount, &rxED, 0);
     if(qMsgRet == pdPASS) {
       if(rxED.count > 0) {
-        Serial.println(F("-- Queue Receive MsgCount --"));
-        Serial.print(F("Index: ")); Serial.println(rxED.index);
-        Serial.print(F("Count: ")); Serial.println(rxED.count);
-        // Serial.print(F("Set color: ")); Serial.println(String(i_email_coli[rxED.index], HEX));
-        sprintf(txt, "0x%06X", i_email_coli[rxED.index]);
-        Serial.print(F("Set color: ")); Serial.println(txt);
-        Serial.println(F("----------------------------"));
         leds[rxED.index].setColorCode(i_email_coli[rxED.index]);
       }
       else leds[rxED.index].setRGB(0, 0, 0);
       FastLED.show();
     }
-    qMsgRet = xQueueReceive(qh_TestLED, &b_TestLED, pdMS_TO_TICKS(10));
-    if(qMsgRet == pdPASS) {
 
+    qMsgRet = xQueueReceive(qh_TestLED, &b_TestLED, 0);
+    if(qMsgRet == pdPASS) {
       if(b_TestLED) {
         for(uint8_t i = 0; i < 4; i++) {
           leds[i].setColorCode(i_email_coli[i]);
@@ -296,7 +297,7 @@ void task_WiFiConn(void* param) {
       Serial.println("");
       Serial.print(F("STA connected to: ")); 
       Serial.println(WiFi.SSID());
-      IPAddress myIP = WiFi.localIP();
+      myIP = WiFi.localIP();
       Serial.print(F("Local IP address: ")); Serial.println(myIP);
       WiFi.enableAP(false);            
       led_flash(STA_MODE_FCOLOR);
@@ -365,7 +366,7 @@ void ap_config() {
   WiFi.mode(WIFI_AP);
   WiFi.softAP(cch_APssid, cch_APpass); 
   Serial.println(F("done"));
-  IPAddress myIP = WiFi.softAPIP();
+  myIP = WiFi.softAPIP();
   Serial.print(F("AP IP address: "));
   Serial.println(myIP);    
 }
@@ -527,15 +528,13 @@ void led_flash(uint32_t colorCode) {
   for (int i = 0; i < 256; i++){
     FastLED.setBrightness(i);
     FastLED.show();
-    delay(2);
-    // vTaskDelay(pdMS_TO_TICKS(1));
+    vTaskDelay(pdMS_TO_TICKS(2));
   }
   vTaskDelay(pdMS_TO_TICKS(250));
   for (int i = 255; i > -1; i--) {
     FastLED.setBrightness(i);
     FastLED.show();
-    delay(2);
-    // vTaskDelay(pdMS_TO_TICKS(1));
+    vTaskDelay(pdMS_TO_TICKS(2));
   }
   for (int i = 0; i < 4; i++) leds[i].setColorCode(0x000000);
   FastLED.setBrightness(255);
@@ -585,6 +584,7 @@ void hw_wifi_param() {
   Serial.print(F("Wi-Fi SSID: ")); Serial.println(ssid);
   Serial.print(F("Wi-Fi pass: ")); Serial.println(pass);
   server.send(200, F("text/html"), F("Wi-Fi setting is updated, module will be rebooting..."));
+
   delay(100);
   WiFi.softAPdisconnect(true);
   delay(100);
@@ -600,6 +600,8 @@ void hw_wifi_param() {
   Serial.println(F("Resetting ESP..."));
   ESP.restart();
 }
+
+#include <Ethernet.h>
 
 void hw_Email_param() {
   Serial.println(F("h_Email_param"));
@@ -634,8 +636,9 @@ void hw_Email_param() {
     f.flush();
     f.close();
   }
-
-  server.send(200, F("text/html"), F("Save E-mail accounts..."));
+  server.sendHeader(F("Location"), F("/index.html"), true);   //Redirect to our html web page
+  server.send(302, F("text/plane"), "");
+  s_snackBarMsg = "E-mail accounts is saved!";
 }
 
 void hw_pushButt() {
@@ -678,7 +681,7 @@ void hw_pushButt() {
 void hw_WebRequests() {
   Serial.println("h_WebRequests");
   print_remote_IP();
-  if(!server.authenticate(cch_web_user, cch_web_pass)) return server.requestAuthentication();
+  if(!server.authenticate(cch_web_user, cch_web_pass)) return server.requestAuthentication();  
   if(loadFromSpiffs(server.uri())) return;
   Serial.println(F("File Not Detected"));
   String message = F("File Not Detected\n\n");
