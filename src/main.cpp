@@ -18,26 +18,32 @@
 #define T_WIFIConn_CPU      CPU0
 #define T_WIFIConn_PRIOR    0
 #define T_WIFIConn_STACK    2048
+#define T_WIFIConn_NAME     "Wi-Fi connect"
 
 #define T_EMailRead_CPU     CPU1
 #define T_EMailRead_PRIOR   0
 #define T_EMailRead_STACK   8192
+#define T_EMailRead_NAME     "E-Mail read"
 
 #define T_WEBServer_CPU     CPU0
 #define T_WEBServer_PRIOR   0
 #define T_WEBServer_STACK   16384
+#define T_WEBServer_NAME    "WEBServer"
 
 #define T_LED_CPU           CPU1
 #define T_LED_PRIOR         0
 #define T_LED_STACK         2048
+#define T_LED_NAME          "LED"
 
 #define T_FTP_CPU           CPU0
 #define T_FTP_PRIOR         0
 #define T_FTP_STACK         8192
+#define T_FTP_NAME          "FTP"
 
 #define T_UPTIME_CPU        CPU1
 #define T_UPTIME_PRIOR      0
 #define T_UPTIME_STACK      1024
+#define T_UPTIME_NAME       "Up time"
 
 TaskHandle_t th_WiFiConnect, th_WEBServer, th_EMailRead, th_LED, th_FTPSrv, th_UpTime;
 QueueHandle_t qh_EMailRead, qh_TestLED, qh_MsgCount;
@@ -138,17 +144,17 @@ void setup() {
   qh_EMailRead = xQueueCreate(1, sizeof(b_EMailRead));
   qh_MsgCount = xQueueCreate(4, sizeof(rxED));
 
-  xTaskCreatePinnedToCore(task_UpTimeCounter, "Up Time Counter", T_UPTIME_STACK, NULL, T_UPTIME_PRIOR, &th_UpTime, T_UPTIME_CPU);  
+  xTaskCreatePinnedToCore(task_UpTimeCounter, T_UPTIME_NAME, T_UPTIME_STACK, NULL, T_UPTIME_PRIOR, &th_UpTime, T_UPTIME_CPU);  
   vTaskDelay(pdMS_TO_TICKS(10));
 
-  xTaskCreatePinnedToCore(task_LED, "LED", T_LED_STACK, NULL, T_LED_PRIOR, &th_LED, T_LED_CPU);  
+  xTaskCreatePinnedToCore(task_LED, T_LED_NAME, T_LED_STACK, NULL, T_LED_PRIOR, &th_LED, T_LED_CPU);  
 
   Serial.println();    
 };
 
 /*** TASKs ********************************************************************************************************************************/ 
 void task_WEBServer(void* param) {
-  print_task_header("WEB Server");
+  print_task_header(T_WEBServer_NAME);
 
   DNSServer dnsServer;
   const char *server_name = "www.notifier.net";
@@ -177,8 +183,8 @@ void task_WEBServer(void* param) {
 }
 
 void task_FTPSrv(void *param) {
-  print_task_header("FTP Server");
-  print_task_state("WiFiConnect", eTaskGetState(th_WiFiConnect));
+  print_task_header(T_FTP_NAME);
+  print_task_state(T_WIFIConn_NAME, eTaskGetState(th_WiFiConnect));
   FtpServer ftpSrv;
   const char cch_ftpUser[] = FTP_USER;
   const char cch_ftpPass[] = FTP_PASS;
@@ -190,7 +196,7 @@ void task_FTPSrv(void *param) {
 }
 
 void task_EMailRead(void *param) {
-  print_task_header("Read E-mail Count");  
+  print_task_header(T_EMailRead_NAME);  
   EMailData txED;
   bool b_fread = false; 
   String str = "";
@@ -210,13 +216,13 @@ void task_EMailRead(void *param) {
       txED.count = readEmail(s_email_srv[txED.index], s_email[txED.index], s_email_pass[txED.index]);
       vTaskDelay(pdMS_TO_TICKS(2000));
       i_email_count[txED.index] = txED.count;
-      xQueueSend(qh_MsgCount, &txED, portMAX_DELAY);
+      xQueueSend(qh_MsgCount, &txED, 0);
     }
   }
 }
 
 void task_UpTimeCounter(void *param) {
-  print_task_header("Up Time Counter"); 
+  print_task_header(T_UPTIME_NAME); 
   ui32_UpTime = 0;
   for(;;) {
     yield();
@@ -226,12 +232,12 @@ void task_UpTimeCounter(void *param) {
 }
 
 void task_LED(void *param) {
-  print_task_header("LED");
+  print_task_header(T_LED_NAME);
   led_init();
   BaseType_t qMsgRet;
   EMailData rxED;
   
-  xTaskCreatePinnedToCore(task_WiFiConn, "WiFi Connect", T_WIFIConn_STACK, NULL, T_WIFIConn_PRIOR, &th_WiFiConnect, T_WIFIConn_CPU);
+  xTaskCreatePinnedToCore(task_WiFiConn, T_WIFIConn_NAME, T_WIFIConn_STACK, NULL, T_WIFIConn_PRIOR, &th_WiFiConnect, T_WIFIConn_CPU);
 
   for(;;) {
     yield();
@@ -266,7 +272,7 @@ void task_LED(void *param) {
 }
 
 void task_WiFiConn(void* param) {
-  print_task_header("Wi-Fi Connect");
+  print_task_header(T_WIFIConn_NAME);
   uint8_t WiFiConnTimeOut = 50;
   Serial.println();
 
@@ -313,23 +319,22 @@ void task_WiFiConn(void* param) {
     read_accounts("/accounts.txt");
   }
   
-  xTaskCreatePinnedToCore(task_WEBServer, "WEB Server", T_WEBServer_STACK, NULL, T_WEBServer_PRIOR, &th_WEBServer, T_WEBServer_CPU);
+  xTaskCreatePinnedToCore(task_WEBServer, T_WEBServer_NAME, T_WEBServer_STACK, NULL, T_WEBServer_PRIOR, &th_WEBServer, T_WEBServer_CPU);
   vTaskDelay(pdMS_TO_TICKS(10));
 
-  xTaskCreatePinnedToCore(task_EMailRead, "E-mail Read", T_EMailRead_STACK, NULL, T_EMailRead_PRIOR, &th_EMailRead, T_EMailRead_CPU);
-  vTaskDelay(pdMS_TO_TICKS(10));
-
-  xTaskCreatePinnedToCore(task_FTPSrv, "FTP", T_FTP_STACK, NULL, T_FTP_PRIOR, &th_FTPSrv, T_FTP_CPU);
+  xTaskCreatePinnedToCore(task_FTPSrv, T_FTP_NAME, T_FTP_STACK, NULL, T_FTP_PRIOR, &th_FTPSrv, T_FTP_CPU);
   vTaskDelay(pdMS_TO_TICKS(10));  
 
   vTaskSuspend(th_FTPSrv);
-  print_task_state("FTPSrv", eTaskGetState(th_FTPSrv));
+  print_task_state(T_FTP_NAME, eTaskGetState(th_FTPSrv));
 
-  xQueueSend(qh_EMailRead, &b_EMailRead, portMAX_DELAY);
-
+  if(WiFi.getMode() == WIFI_STA) {
+    xTaskCreatePinnedToCore(task_EMailRead, T_EMailRead_NAME, T_EMailRead_STACK, NULL, T_EMailRead_PRIOR, &th_EMailRead, T_EMailRead_CPU);
+    vTaskDelay(pdMS_TO_TICKS(10));
+    xQueueSend(qh_EMailRead, &b_EMailRead, portMAX_DELAY);
+  }
   vTaskDelete(NULL);
 }
-
 /*******************************************************************************************/
 
 /*-----------------------------------------------------------------------------------------*/
@@ -601,8 +606,6 @@ void hw_wifi_param() {
   ESP.restart();
 }
 
-#include <Ethernet.h>
-
 void hw_Email_param() {
   Serial.println(F("h_Email_param"));
   print_remote_IP();
@@ -651,11 +654,11 @@ void hw_pushButt() {
   }
   if(server.hasArg(F("buttID"))) {
     if(server.arg(F("buttID")) == F("butFRead")) {
-      xQueueSend(qh_EMailRead, &b_EMailRead, portMAX_DELAY);
+      xQueueSend(qh_EMailRead, &b_EMailRead, 0);
     }
     if(server.arg(F("buttID")) == F("butTestLED")) {
       b_TestLED = !b_TestLED;      
-      xQueueSend(qh_TestLED, &b_TestLED, portMAX_DELAY);
+      xQueueSend(qh_TestLED, &b_TestLED, 0);
     }
     if(server.arg(F("buttID")) == F("butReboot")) {
       s_snackBarMsg = "Notifier will be rebooted!";
@@ -672,7 +675,7 @@ void hw_pushButt() {
         s_snackBarMsg = "FTP Disabled";
         vTaskSuspend(th_FTPSrv);
       }
-      print_task_state("FTPSrv", eTaskGetState(th_FTPSrv));
+      print_task_state(T_FTP_NAME, eTaskGetState(th_FTPSrv));
     }
   }
   server.send(200, F("text/xml"), build_XML());
