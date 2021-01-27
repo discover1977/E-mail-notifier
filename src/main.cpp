@@ -12,6 +12,11 @@
 #include <Adafruit_Si7021.h>
 #include <Wire.h>
 
+#include <WiFiClientSecure.h>
+#include <UniversalTelegramBot.h>
+// Telegram BOT Token (Get from Botfather)
+#define BOT_TOKEN "1548888690:AAEjltv4UlcMKW5FEYdNbXpdsOZD6lKkLqY"
+
 #define FW_VERSION          "2.0"
 
 #define CPU0  0
@@ -45,7 +50,11 @@
 #define T_CC811_PRIOR       0
 #define T_CC811_STACK       2048
 
-TaskHandle_t th_WiFiConnect, th_WEBServer, th_EMailRead, th_LED, th_FTPSrv, th_UpTime, th_ReadSensor;
+#define T_TBOT_CPU          CPU0
+#define T_TBOT_PRIOR        0
+#define T_TBOT_STACK        8192
+
+TaskHandle_t th_WiFiConnect, th_WEBServer, th_EMailRead, th_LED, th_FTPSrv, th_UpTime, th_ReadSensor, th_TelegramBot;
 QueueHandle_t qh_EMailRead, qh_TestLED, qh_MsgCount;
 
 #define START_FCOLOR        0xFFFFFF
@@ -74,8 +83,10 @@ void task_LED(void *param);
 void task_FTPSrv(void *param);
 void task_UpTimeCounter(void *param);
 void task_ReadSensor(void *param);
+void task_TelegramBot(void *param);
 
 /* Прочие функции */
+void handleNewMessages(int numNewMessages);
 void print_task_header(String taskName);
 void ap_config();
 void eeprom_init();
@@ -105,6 +116,9 @@ void h_XML();
 /*
 * Global variables
 */
+WiFiClientSecure secured_client;
+UniversalTelegramBot bot(BOT_TOKEN, secured_client);
+
 const float k = 0.1;
 bool b_EMailRead = false;
 
@@ -193,6 +207,44 @@ void task_WEBServer(void* param) {
     /* Обработка запросов HTML клиента */
     server.handleClient();
     vTaskDelay(1);
+  }
+}
+
+String ut_to_str(uint32_t val) {
+  uint32_t d = round(val / 86400);
+  uint32_t h = round(val / 3600);
+  uint32_t m = round(val / 60) - (h * 60);
+  uint32_t s = val % 60;
+  char txt[16];
+  sprintf(txt, "%d.%02d:%02d:%02d", d, h, m, s);
+
+  return String(txt);
+}
+
+void task_TelegramBot(void *param) {
+  print_task_header("Telegram Bot task");
+
+  secured_client.setCACert(TELEGRAM_CERTIFICATE_ROOT);
+
+  Serial.print("Retrieving time: ");
+  configTime(0, 0, "pool.ntp.org"); // get UTC time via NTP
+  time_t now = time(nullptr);
+  while (now < 24 * 3600) {
+    Serial.print(".");
+    delay(100);
+    now = time(nullptr);
+  }
+  Serial.println(now);
+
+  for (;;) {
+    yield();
+    int numNewMessages = bot.getUpdates(bot.last_message_received + 1);
+
+    while (numNewMessages) {
+      handleNewMessages(numNewMessages);
+      numNewMessages = bot.getUpdates(bot.last_message_received + 1);
+    }
+    vTaskDelay(pdMS_TO_TICKS(100));    
   }
 }
 
@@ -411,9 +463,7 @@ void task_LED(void *param) {
           s_snackBarMsg = "LED Test Off";
           FastLED.show();
         }; break;
-      }      
-      //for(int i = 0; i < 4; i++) leds[i] = tmpLed[i];
-      //FastLED.show();
+      }
     }
   }
 }
@@ -484,6 +534,9 @@ void task_WiFiConn(void* param) {
   print_task_state("FTPSrv", eTaskGetState(th_FTPSrv));
 
   xTaskCreatePinnedToCore(task_ReadSensor, "CC811", T_CC811_STACK, NULL, T_CC811_PRIOR, &th_ReadSensor, T_CC811_CPU);
+  vTaskDelay(pdMS_TO_TICKS(1000));  
+
+  xTaskCreatePinnedToCore(task_TelegramBot, "Telegram BOT", T_TBOT_STACK, NULL, T_TBOT_PRIOR, &th_TelegramBot, T_TBOT_CPU);
   vTaskDelay(pdMS_TO_TICKS(10));  
 
   vTaskDelete(NULL);
@@ -491,6 +544,66 @@ void task_WiFiConn(void* param) {
 /*******************************************************************************************/
 
 /*-----------------------------------------------------------------------------------------*/
+
+const uint8_t idListCount = 2;
+String idList[idListCount] = {"782349539", "387482808"};  // Я, Дима Мухин
+
+void handleNewMessages(int numNewMessages)
+{
+  Serial.println(F("New TB Messages"));
+  bool registredID = false;
+
+  for (int i = 0; i < numNewMessages; i++) {
+    String chat_id = bot.messages[i].chat_id;
+    String text = bot.messages[i].text;
+
+    Serial.println(F("Chat data..."));
+    Serial.println("id: " + chat_id);
+    Serial.println("user: " + bot.messages[i].from_name);
+    Serial.println("message: " + text);
+
+    for(uint8_t i = 0; i < idListCount; i++) {
+      if(idList[i] == chat_id) {
+        registredID = true;
+        break;
+      }
+    }
+    if(!registredID) {
+      Serial.println(F("Chat ID not registred!!!"));
+      return;
+    }
+
+    String from_name = bot.messages[i].from_name;
+    if (from_name == "") from_name = "Guest";
+
+    if (text == "/start") {
+      String welcome = "Привет, " + from_name + ".\r\n\r\n";
+      welcome += "Мои команды:\r\n";
+      welcome += "/start  - Запуск Бота\r\n";
+      //welcome += "/butt   - Show my buttons";
+      welcome += "/uptime - Время работы\r\n";
+      welcome += "/sens - Датчики";
+      bot.sendMessage(chat_id, welcome);
+      return;
+    }
+
+    if ((text == "/uptime") || (text == "Uptime")) {
+      bot.sendMessage(chat_id, "Время работы: " + ut_to_str(ui32_UpTime));
+      return;
+    }
+
+    if ((text == "/sens") || (text == "Sensors")) {
+      String str = "Датчики:\r\n";
+      str += "Температура - " + String(f_Temperature, 1) + " С°\r\n";
+      str += "Влажность - " + String(f_Humidity, 1) + " %\r\n";
+      str += "eCO2 - " + String(ui16_CO2) + " ppm\r\n";
+      str += "eTVOC - " + String(ui16_TVOC) + " ppb\r\n";
+      bot.sendMessage(chat_id, str);
+      return;
+    }
+  }
+}
+
 void print_task_header(String taskName) {
   char taskStr[4] = {'T', 'a', 's', 'k'};
   int strLenght = (taskName.length() <= 11)?(15):(taskName.length() + 4);
