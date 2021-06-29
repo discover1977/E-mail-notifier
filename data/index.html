@@ -107,16 +107,6 @@
 				text-align: center;
 			}
 
-			.co2 {
-				font-size: 64px;
-				color: #20AA20;
-			}
-
-			.tvoc {
-				font-size: 64px;
-				color: #b0d2d8;
-			}
-
 			/* Style the tab */
 			.tab {
 				overflow: hidden;
@@ -496,14 +486,18 @@
 					xmlHttp = new ActiveXObject('Microsoft.XMLHTTP');
 				}
 				return xmlHttp;
-			}			
+			}	
 
-			function ut_to_str(ut) {
-				var d = Math.floor(ut / 86400);
-				var h = Math.floor(ut / 3600);
-				var m = Math.floor(ut / 60) - (h * 60);
-				var s = ut % 60;
-				pbVal = s;
+	
+
+			function ut_to_str(sec) {				
+				var m = Math.floor(sec / 60);
+				var h = Math.floor(m / 60);
+				var d = Math.floor(h / 24);	
+				m = m % 60;
+				h = h % 24;				
+				var s = Math.floor(sec % 60);	
+
 				return utStr = (d) + "." + 
 							   (h.toString().padStart(2, '0')) + ":" + 
 							   (m.toString().padStart(2, '0')) + ":" + 
