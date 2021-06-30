@@ -10,7 +10,7 @@
 #include <ElegantOTA.h>
 #include <DNSServer.h>
 
-#define FW_VERSION          "2.2"
+#define FW_VERSION          "2.3"
 
 #define CPU0  0
 #define CPU1  1
@@ -209,10 +209,12 @@ void task_EMailRead(void *param) {
       vTaskDelay(pdMS_TO_TICKS(2000));
     }
     for (txED.index = 0; txED.index < 4; txED.index++) {
+        str = "Reading: " + s_email[txED.index];
+        s_snackBarMsg = str;
       txED.count = readEmail(s_email_srv[txED.index], s_email[txED.index], s_email_pass[txED.index]);
       Serial.println("Reading: " + s_email[txED.index]);
-      str = "Reading: " + s_email[txED.index];
-      s_snackBarMsg = str;
+      //str = "Reading: " + s_email[txED.index];
+      //s_snackBarMsg = str;
       txED.count = readEmail(s_email_srv[txED.index], s_email[txED.index], s_email_pass[txED.index]);
       vTaskDelay(pdMS_TO_TICKS(2000));
       i_email_count[txED.index] = txED.count;
